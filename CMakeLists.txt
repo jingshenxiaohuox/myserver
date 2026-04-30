@@ -1,0 +1,11 @@
+cmake_minimum_required(VERSION 3.10)
+project(MyTcpServer)
+
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# 开启所有常见警告，培养良好的编码习惯
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -g -O0")
+
+# 我们的主程序叫 gateway_server
+add_executable(gateway_server src/main.cpp)
