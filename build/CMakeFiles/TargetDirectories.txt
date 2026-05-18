@@ -1,0 +1,3 @@
+/home/ljq/myserver/build/CMakeFiles/gateway_server.dir
+/home/ljq/myserver/build/CMakeFiles/edit_cache.dir
+/home/ljq/myserver/build/CMakeFiles/rebuild_cache.dir
