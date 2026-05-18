@@ -69,6 +69,10 @@ int main() {
     //创建监听事件列表
     struct epoll_event events[MAX_EVENTS];
     std::cout << "开始监听端口：" << PORT << "传来的消息......\n";
+
+    std::vector<char> full_packet;
+    full_packet.reserve(8192); // 预留空间
+
     //进入事件主循环
     while (true) {
         //获取目前就绪的事件列表
@@ -129,7 +133,7 @@ int main() {
                             MsgHeader header;
                             rb.peek(reinterpret_cast<char*>(&header), sizeof(MsgHeader));
                             //先判断是不是正确的包,魔法数对不上就丢弃
-                            if (ntohs(header.magic) != 0x5A5A) {
+                            if (ntohs(header.magic) != MAGIC_NUMBER) {
                                 std::cerr << "文件描述符:" << client_fd << "收到非魔法数,可能是一个垃圾包,断开连接\n";
                                 epoll_ctl(epoll_fd, EPOLL_CTL_DEL, client_fd, nullptr);
                                 close(client_fd);
@@ -148,7 +152,7 @@ int main() {
 
                             //状态C:提取完整包并滑动窗口
 
-                            std::vector<char> full_packet(total_packet_size);//?这里没问题吗?
+                            full_packet.resize(total_packet_size);
                             rb.peek(full_packet.data(), total_packet_size);
                             rb.retrieve(total_packet_size);
 
@@ -164,14 +168,18 @@ int main() {
                         }
                         else {//进入这个分支通常代表客户端已经关闭,或者tcp已经出现异常,留着连接不放只会无谓的浪费系统的资源
                             std::cerr <<  client_fd << "没成功从内核读到数据" << "\n";
+                            epoll_ctl(epoll_fd, EPOLL_CTL_DEL, client_fd, nullptr);
                             close(client_fd);//对面连接可能出现了错误，直接把这个连接关闭
+                            client_buffers.erase(client_fd);
                             break;
                         }
                     }
                     else if (bytes_read == 0) {
                         //客户端完成四次挥手正常关闭连接
                         std::cout << "客户端:" << client_fd << "正常关闭连接\n";
+                        epoll_ctl(epoll_fd, EPOLL_CTL_DEL, client_fd, nullptr);
                         close(client_fd);
+                        client_buffers.erase(client_fd);
                         break; 
                     }
                     else {
