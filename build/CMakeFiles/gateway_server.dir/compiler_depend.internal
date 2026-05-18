@@ -77,6 +77,7 @@ CMakeFiles/gateway_server.dir/src/main.cpp.o
  /usr/include/c++/13/cctype
  /usr/include/c++/13/cerrno
  /usr/include/c++/13/clocale
+ /usr/include/c++/13/cstddef
  /usr/include/c++/13/cstdint
  /usr/include/c++/13/cstdio
  /usr/include/c++/13/cstdlib
@@ -240,6 +241,10 @@ CMakeFiles/gateway_server.dir/src/main.cpp.o
  /usr/lib/gcc/x86_64-linux-gnu/13/include/stddef.h
  /usr/lib/gcc/x86_64-linux-gnu/13/include/stdint.h
 
+CMakeFiles/gateway_server.dir/src/protocol.cpp.o
+ /home/ljq/myserver/src/protocol.cpp
+ /usr/include/stdc-predef.h
+
 CMakeFiles/gateway_server.dir/src/ringbuffer.cpp.o
  /home/ljq/myserver/src/ringbuffer.cpp
  /home/ljq/myserver/include/ringbuffer.h
@@ -310,6 +315,7 @@ CMakeFiles/gateway_server.dir/src/ringbuffer.cpp.o
  /usr/include/c++/13/cctype
  /usr/include/c++/13/cerrno
  /usr/include/c++/13/clocale
+ /usr/include/c++/13/cstddef
  /usr/include/c++/13/cstdio
  /usr/include/c++/13/cstdlib
  /usr/include/c++/13/cstring

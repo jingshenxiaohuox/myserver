@@ -76,6 +76,7 @@ CMakeFiles/gateway_server.dir/src/main.cpp.o: /home/ljq/myserver/src/main.cpp \
   /usr/include/c++/13/cctype \
   /usr/include/c++/13/cerrno \
   /usr/include/c++/13/clocale \
+  /usr/include/c++/13/cstddef \
   /usr/include/c++/13/cstdint \
   /usr/include/c++/13/cstdio \
   /usr/include/c++/13/cstdlib \
@@ -239,6 +240,9 @@ CMakeFiles/gateway_server.dir/src/main.cpp.o: /home/ljq/myserver/src/main.cpp \
   /usr/lib/gcc/x86_64-linux-gnu/13/include/stddef.h \
   /usr/lib/gcc/x86_64-linux-gnu/13/include/stdint.h
 
+CMakeFiles/gateway_server.dir/src/protocol.cpp.o: /home/ljq/myserver/src/protocol.cpp \
+  /usr/include/stdc-predef.h
+
 CMakeFiles/gateway_server.dir/src/ringbuffer.cpp.o: /home/ljq/myserver/src/ringbuffer.cpp \
   /home/ljq/myserver/include/ringbuffer.h \
   /usr/include/alloca.h \
@@ -308,6 +312,7 @@ CMakeFiles/gateway_server.dir/src/ringbuffer.cpp.o: /home/ljq/myserver/src/ringb
   /usr/include/c++/13/cctype \
   /usr/include/c++/13/cerrno \
   /usr/include/c++/13/clocale \
+  /usr/include/c++/13/cstddef \
   /usr/include/c++/13/cstdio \
   /usr/include/c++/13/cstdlib \
   /usr/include/c++/13/cstring \
@@ -479,10 +484,6 @@ CMakeFiles/gateway_server.dir/src/ringbuffer.cpp.o: /home/ljq/myserver/src/ringb
 
 /usr/include/x86_64-linux-gnu/bits/types/struct_tm.h:
 
-/usr/include/c++/13/bits/stl_algo.h:
-
-/usr/include/x86_64-linux-gnu/bits/types/struct_timespec.h:
-
 /usr/include/x86_64-linux-gnu/bits/types/struct_sched_param.h:
 
 /usr/include/c++/13/bits/stl_tempbuf.h:
@@ -584,6 +585,10 @@ CMakeFiles/gateway_server.dir/src/ringbuffer.cpp.o: /home/ljq/myserver/src/ringb
 /usr/include/x86_64-linux-gnu/bits/stdint-uintn.h:
 
 /usr/include/unistd.h:
+
+/usr/include/x86_64-linux-gnu/bits/struct_rwlock.h:
+
+/usr/include/strings.h:
 
 /usr/include/c++/13/bits/stl_construct.h:
 
@@ -755,6 +760,12 @@ CMakeFiles/gateway_server.dir/src/ringbuffer.cpp.o: /home/ljq/myserver/src/ringb
 
 /usr/include/c++/13/bits/erase_if.h:
 
+/usr/include/c++/13/bits/stl_algo.h:
+
+/usr/include/x86_64-linux-gnu/bits/types/struct_timespec.h:
+
+/usr/include/c++/13/cstddef:
+
 /usr/include/x86_64-linux-gnu/bits/types/struct_osockaddr.h:
 
 /usr/include/c++/13/vector:
@@ -893,6 +904,8 @@ CMakeFiles/gateway_server.dir/src/ringbuffer.cpp.o: /home/ljq/myserver/src/ringb
 
 /usr/include/linux/errno.h:
 
+/home/ljq/myserver/src/protocol.cpp:
+
 /usr/include/x86_64-linux-gnu/bits/pthreadtypes-arch.h:
 
 /usr/include/x86_64-linux-gnu/asm/bitsperlong.h:
@@ -916,7 +929,3 @@ CMakeFiles/gateway_server.dir/src/ringbuffer.cpp.o: /home/ljq/myserver/src/ringb
 /usr/include/stdint.h:
 
 /usr/include/string.h:
-
-/usr/include/x86_64-linux-gnu/bits/struct_rwlock.h:
-
-/usr/include/strings.h:

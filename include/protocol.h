@@ -1,6 +1,15 @@
 #pragma once
 #include <cstdint>
 
+static constexpr uint16_t MAGIC_NUMBER = 520;
+static constexpr uint32_t MAX_PAYLOAD_SIZE = 4 * 1024 * 1024; //4MB
+
+enum class MsgType : uint16_t {
+    HeartBeat = 0x0001,
+    VideoFrame = 0x0002,
+};
+
+
 #pragma pack(push, 1)//防止内存对齐,由于编译器处理机制不同,无强制对齐可能导致消息错误解译
 //协议规定
 struct MsgHeader {
@@ -12,3 +21,5 @@ struct MsgHeader {
     uint16_t organization;//消息的发送者的组织
  };
 #pragma pack(pop)
+
+bool isValidHeader(const MsgHeader& header);
