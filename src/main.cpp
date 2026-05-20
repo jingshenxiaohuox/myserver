@@ -12,16 +12,105 @@
 #include <unordered_map>
 #include <vector>
 
-std::unordered_map<int, RingBuffer> client_buffers;
+
 const int MAX_EVENTS = 1024; //定义最大事件数为1024
 const int PORT = 8081; //定义服务器监听的端口号为8081
+
 
 void setNonBlocking(int fd) { //定义一个函数用于设置文件描述符为非阻塞模式
     int flags = fcntl(fd, F_GETFL, 0); //获取文件描述符的当前标志
     fcntl(fd, F_SETFL, flags | O_NONBLOCK); //将非阻塞标志添加到当前标志中
 }
 
+struct ClientContext {
+    RingBuffer recv_buffer; //接收缓冲区
+    RingBuffer send_buffer; //发送缓冲区
+    int client_fd;
+    time_t last_active_time; //上一次活跃时间
+
+    ClientContext() : recv_buffer(8192), send_buffer(8192), client_fd(-1), last_active_time(time(nullptr)) {}
+};
+
+std::unordered_map<int, ClientContext> clients;
+
+void update_epollout(int epoll_fd, struct ClientContext* ctx) {
+    struct epoll_event event{};
+    if (ctx->send_buffer.empty()) {
+        event.events = EPOLLIN | EPOLLET;
+    }
+    else {
+        event.events = EPOLLIN | EPOLLET | EPOLLOUT;
+    }
+    event.data.fd = ctx->client_fd;
+    epoll_ctl(epoll_fd, EPOLL_CTL_MOD, ctx->client_fd, &event);
+}
+
+void close_client(int epoll_fd, struct ClientContext* ctx) {
+    epoll_ctl(epoll_fd, EPOLL_CTL_DEL, ctx->client_fd, nullptr);
+    close(ctx->client_fd);
+    clients.erase(ctx->client_fd);
+}
+
+void send_data(int epoll_fd, struct ClientContext* ctx, const char* data, size_t len) {
+    ssize_t sent = write(ctx->client_fd, data, len);
+    if (sent == len) {
+        //数据都发完了，万事大吉！！！
+        update_epollout(epoll_fd, ctx);
+    }
+    else if (sent >= 0 && sent < len) {
+        //没发完
+        ctx->send_buffer.append(data + sent, len - sent);
+        update_epollout(epoll_fd, ctx);
+    }
+    else {
+        if (errno == EAGAIN) {
+            //内核缓冲区满了
+            ctx->send_buffer.append(data, len);
+            update_epollout(epoll_fd, ctx);
+        }
+        else {
+            //连接异常，发送失败
+            close_client(epoll_fd, ctx);
+        }
+    }
+}
+
+void handle_write(int epoll_fd, struct ClientContext* ctx) {
+    /*
+    1. peek 数据到临时缓冲区
+    2. 直接 write()
+    3. 如果发完了 → retrieve 全部 → update_epollout
+    4. 如果发了一部分 → retrieve 已发送的部分 → 保持 EPOLLOUT
+    5. 如果出错 → close_client
+    */
+    size_t wait_send = ctx->send_buffer.readableBytes();
+    std::vector<char> data(wait_send);
+    ctx->send_buffer.peek(data.data(), wait_send);
+    ssize_t sent = write(ctx->client_fd, data.data(), wait_send);
+    if (sent == wait_send) {
+        ctx->send_buffer.retrieve(wait_send);
+        update_epollout(epoll_fd, ctx);
+    }
+    else if (sent >= 0 && sent < wait_send) {
+        ctx->send_buffer.retrieve(sent);
+    }
+    else {
+        if (errno == EAGAIN) {
+            //内核缓冲区满了，发不了
+            
+        }
+        else {
+            //出问题了，关闭连接
+            close_client(epoll_fd, ctx);
+        }
+    }
+
+}
+
+
+
 int main() {
+    signal(SIGPIPE, SIG_IGN);
     //创建一个TCP套接字
     int server_fd = socket(AF_INET, SOCK_STREAM, 0); //使用socket()函数创建一个TCP套接字，返回一个文件描述符
     //检查分配文件描述符是否成功
@@ -76,7 +165,27 @@ int main() {
     //进入事件主循环
     while (true) {
         //获取目前就绪的事件列表
-        int ready_num = epoll_wait(epoll_fd, events, MAX_EVENTS, -1);
+        int ready_num = epoll_wait(epoll_fd, events, MAX_EVENTS, 5000);
+
+        //心跳保活实现
+        if (ready_num == 0) {
+            time_t now = time(nullptr);
+            for (auto it = clients.begin(); it != clients.end(); ) {
+                int fd = it->first;
+                time_t last_active = it->second.last_active_time;
+
+                if (now - last_active > 30) {//30秒算超时
+                    std::cerr << "客户端：" << fd << "心跳超时，连接断开\n";
+                    //这里关闭client连接没有使用close_client函数是因为要保留erase返回的迭代器
+                    epoll_ctl(epoll_fd, EPOLL_CTL_DEL, fd, nullptr);
+                    close(fd);
+                    it = clients.erase(it);//因为删除操作会使后续的迭代器失效，erase会返回后续的迭代器，必须要用一个变量接住！！！
+                }
+                else {
+                    it++;
+                }
+            }
+        }
 
         //开始在循环处理这次的就绪事件
         for (int i = 0; i < ready_num; i++) {
@@ -102,7 +211,8 @@ int main() {
 
                     //将新的设备挂在到epoll_fd的监听红黑树上面，并设置监听模式为非阻塞式监听
                     setNonBlocking(client_fd);
-                    client_buffers.emplace(client_fd, RingBuffer());//为新连接上的客户端分配缓冲区,默认缓冲区大小是8kb
+                    clients.emplace(client_fd, ClientContext{});//为新连接上的客户端分配缓冲区,默认缓冲区大小是8kb
+                    clients[client_fd].client_fd = client_fd;
                     struct epoll_event client_event{};
                     client_event.events = EPOLLIN | EPOLLET;
                     client_event.data.fd = client_fd;
@@ -114,13 +224,15 @@ int main() {
             else if (events[i].events & EPOLLIN) {//epollin是读事件，有数据发进来了
                 int client_fd = events[i].data.fd;
                 char buffer[1024];//把从内核传过来的数据暂时放到缓冲区当中
+                bool connection_closed = false;
 
                 //因为是边缘触发模式，必须要用一个while循环一次读完
                 while (true) {
                     memset(buffer, 0, sizeof(buffer));//把缓冲区内的数据初始化为0，防止读到垃圾数据
                     ssize_t bytes_read = recv(client_fd, buffer, sizeof(buffer) - 1, 0);
                     if (bytes_read > 0) {
-                        RingBuffer& rb = client_buffers[client_fd];
+                        RingBuffer& rb = clients[client_fd].recv_buffer;
+                        clients[client_fd].last_active_time = time(nullptr);
                         rb.append(buffer, bytes_read);
                         while (true) {
                             //状态A:解析包头
@@ -135,9 +247,8 @@ int main() {
                             //先判断是不是正确的包,魔法数对不上就丢弃
                             if (ntohs(header.magic) != MAGIC_NUMBER) {
                                 std::cerr << "文件描述符:" << client_fd << "收到非魔法数,可能是一个垃圾包,断开连接\n";
-                                epoll_ctl(epoll_fd, EPOLL_CTL_DEL, client_fd, nullptr);
-                                close(client_fd);
-                                client_buffers.erase(client_fd);
+                                close_client(epoll_fd, &(clients[client_fd]));
+                                connection_closed = true;
                                 break;
                             }
                             //状态B:提取包体
@@ -168,23 +279,20 @@ int main() {
                         }
                         else {//进入这个分支通常代表客户端已经关闭,或者tcp已经出现异常,留着连接不放只会无谓的浪费系统的资源
                             std::cerr <<  client_fd << "没成功从内核读到数据" << "\n";
-                            epoll_ctl(epoll_fd, EPOLL_CTL_DEL, client_fd, nullptr);
-                            close(client_fd);//对面连接可能出现了错误，直接把这个连接关闭
-                            client_buffers.erase(client_fd);
+                            close_client(epoll_fd, &(clients[client_fd]));  
                             break;
                         }
                     }
                     else if (bytes_read == 0) {
                         //客户端完成四次挥手正常关闭连接
                         std::cout << "客户端:" << client_fd << "正常关闭连接\n";
-                        epoll_ctl(epoll_fd, EPOLL_CTL_DEL, client_fd, nullptr);
-                        close(client_fd);
-                        client_buffers.erase(client_fd);
+                        close_client(epoll_fd, &(clients[client_fd]));
                         break; 
                     }
                     else {
                         std::cout << "收到数据: " << bytes_read << "字节" << "数据来自" << client_fd << " 数据内容:" << buffer << "\n";
                     }
+                    if (connection_closed) break;
                 }
                 
             }

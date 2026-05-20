@@ -28,6 +28,9 @@ public:
     //提取数据并移动读指针
     void retrieve(size_t len);
 
+    //判断当前的缓冲区是否是空的
+    bool empty() const;
+
 private:
     std::vector<char> buffer_;
     size_t capacity_;//物理的总容量

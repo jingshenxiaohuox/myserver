@@ -65,3 +65,7 @@ void RingBuffer::retrieve(size_t len) {
         read_idx_ = (read_idx_ + len) % capacity_;
     }
 }
+
+bool RingBuffer::empty() const{
+    return read_idx_ == write_idx_;
+}
