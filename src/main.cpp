@@ -223,6 +223,7 @@ int main() {
             }
             else if (events[i].events & EPOLLIN) {//epollin是读事件，有数据发进来了
                 int client_fd = events[i].data.fd;
+                struct ClientContext* ctx = &clients[client_fd];
                 char buffer[1024];//把从内核传过来的数据暂时放到缓冲区当中
                 bool connection_closed = false;
 
@@ -270,6 +271,12 @@ int main() {
                             std::cout << "成功解包! 文件描述符: " << client_fd
                                       << " 业务类型: " << ntohs(header.type)
                                       << " 包体长度: " << body_length << "字节\n";
+                            
+                            //判断是否是心跳包
+                            if (ntohs(header.type) == static_cast<uint16_t>MsgType::HeartBeat) {
+                                int sent = send_data(epoll_fd, ctx, reinterpret_cast<char*>(&header),sizeof(header));
+                            }
+                            
                         }
                     }
                     if (bytes_read == -1) {
@@ -295,6 +302,12 @@ int main() {
                     if (connection_closed) break;
                 }
                 
+            }
+            else if (events[i].events & EPOLLOUT) {
+                int client_fd = events[i].data.fd;
+                if (clients.find(client_fd) == clients.end()) continue;
+                struct ClientContext* ctx = &clients[client_fd];
+                handle_write(epoll_fd, ctx);
             }
             
             //如果监听到的就绪文件描述符不是server的，那就肯定是客户端的，证明有新的数据过来了
