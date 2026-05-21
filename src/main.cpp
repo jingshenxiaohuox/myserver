@@ -15,6 +15,7 @@
 
 const int MAX_EVENTS = 1024; //定义最大事件数为1024
 const int PORT = 8081; //定义服务器监听的端口号为8081
+static constexpr size_t HIGH_WATER_MARK = 6144;
 
 
 void setNonBlocking(int fd) { //定义一个函数用于设置文件描述符为非阻塞模式
@@ -60,17 +61,28 @@ void send_data(int epoll_fd, struct ClientContext* ctx, const char* data, size_t
     else if (sent >= 0 && sent < len) {
         //没发完
         ctx->send_buffer.append(data + sent, len - sent);
+        if (ctx->send_buffer.readableBytes() > HIGH_WATER_MARK) {
+            cerr << ctx->client_fd << ":\n这个客户端是一个慢客户端，先踢掉了\n";
+            close_client(epoll_fd, ctx);
+            return;
+        }
         update_epollout(epoll_fd, ctx);
     }
     else {
         if (errno == EAGAIN) {
             //内核缓冲区满了
             ctx->send_buffer.append(data, len);
+            if (ctx->send_buffer.readableBytes() > HIGH_WATER_MARK) {
+            cerr << ctx->client_fd << ":\n这个客户端是一个慢客户端，先踢掉了\n";
+            close_client(epoll_fd, ctx);
+            return;
+        }
             update_epollout(epoll_fd, ctx);
         }
         else {
             //连接异常，发送失败
             close_client(epoll_fd, ctx);
+            return;
         }
     }
 }
@@ -164,29 +176,28 @@ int main() {
 
     //进入事件主循环
     while (true) {
+        
         //获取目前就绪的事件列表
         int ready_num = epoll_wait(epoll_fd, events, MAX_EVENTS, 5000);
 
         //心跳保活实现
-        if (ready_num == 0) {
-            time_t now = time(nullptr);
-            for (auto it = clients.begin(); it != clients.end(); ) {
-                int fd = it->first;
-                time_t last_active = it->second.last_active_time;
+        time_t now = time(nullptr);
+        for (auto it = clients.begin(); it != clients.end(); ) {
+            int fd = it->first;
+            time_t last_active = it->second.last_active_time;
 
-                if (now - last_active > 30) {//30秒算超时
-                    std::cerr << "客户端：" << fd << "心跳超时，连接断开\n";
-                    //这里关闭client连接没有使用close_client函数是因为要保留erase返回的迭代器
-                    epoll_ctl(epoll_fd, EPOLL_CTL_DEL, fd, nullptr);
-                    close(fd);
-                    it = clients.erase(it);//因为删除操作会使后续的迭代器失效，erase会返回后续的迭代器，必须要用一个变量接住！！！
-                }
-                else {
-                    it++;
-                }
+            if (now - last_active > 30) {//30秒算超时
+                std::cerr << "客户端：" << fd << "心跳超时，连接断开\n";
+                //这里关闭client连接没有使用close_client函数是因为要保留erase返回的迭代器
+                epoll_ctl(epoll_fd, EPOLL_CTL_DEL, fd, nullptr);
+                close(fd);
+                it = clients.erase(it);//因为删除操作会使后续的迭代器失效，erase会返回后续的迭代器，必须要用一个变量接住！！！
+            }
+            else {
+                it++;
             }
         }
-
+        
         //开始在循环处理这次的就绪事件
         for (int i = 0; i < ready_num; i++) {
             //区分事件类型，如果监听到的就绪文件描述符是server，证明有新的连接来了
@@ -273,8 +284,8 @@ int main() {
                                       << " 包体长度: " << body_length << "字节\n";
                             
                             //判断是否是心跳包
-                            if (ntohs(header.type) == static_cast<uint16_t>MsgType::HeartBeat) {
-                                int sent = send_data(epoll_fd, ctx, reinterpret_cast<char*>(&header),sizeof(header));
+                            if (ntohs(header.type) == static_cast<uint16_t>(MsgType::HeartBeat)) {
+                                send_data(epoll_fd, ctx, reinterpret_cast<char*>(&header),sizeof(header));
                             }
                             
                         }
