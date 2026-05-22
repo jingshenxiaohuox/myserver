@@ -299,6 +299,7 @@ int main() {
                             
                         }
                     }
+                    if (connection_closed) break;
                     if (bytes_read == -1) {
                         if (errno == EAGAIN || errno == EWOULDBLOCK) {
                             //读干净了
@@ -319,7 +320,7 @@ int main() {
                     else {
                         std::cout << "收到数据: " << bytes_read << "字节" << "数据来自" << client_fd << " 数据内容:" << buffer << "\n";
                     }
-                    if (connection_closed) break;
+                    
                 }
                 
             }
