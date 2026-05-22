@@ -15,3 +15,6 @@ add_executable(gateway_server
 )
 
 target_include_directories(gateway_server PRIVATE include)
+
+
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)

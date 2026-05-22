@@ -11,6 +11,8 @@
 #include "ringbuffer.h"
 #include <unordered_map>
 #include <vector>
+#include <queue>
+#include <csignal>
 
 
 const int MAX_EVENTS = 1024; //定义最大事件数为1024
@@ -33,6 +35,17 @@ struct ClientContext {
 };
 
 std::unordered_map<int, ClientContext> clients;
+struct TimerEntry {
+    time_t expire; //绝对超时时刻
+    int fd;        //对应的连接
+};
+struct CmpExpire {
+    bool operator()(const TimerEntry& a, const TimerEntry& b) {
+        return a.expire > b.expire; //大的排在后面，小的在堆顶
+    }
+};
+std::priority_queue<TimerEntry, std::vector<TimerEntry>, CmpExpire> timer_heap;
+
 
 void update_epollout(int epoll_fd, struct ClientContext* ctx) {
     struct epoll_event event{};
@@ -54,15 +67,15 @@ void close_client(int epoll_fd, struct ClientContext* ctx) {
 
 void send_data(int epoll_fd, struct ClientContext* ctx, const char* data, size_t len) {
     ssize_t sent = write(ctx->client_fd, data, len);
-    if (sent == len) {
+    if (sent >= 0 && static_cast<size_t>(sent) == len) {
         //数据都发完了，万事大吉！！！
         update_epollout(epoll_fd, ctx);
     }
-    else if (sent >= 0 && sent < len) {
+    else if (sent >= 0 && static_cast<size_t>(sent) < len) {
         //没发完
         ctx->send_buffer.append(data + sent, len - sent);
         if (ctx->send_buffer.readableBytes() > HIGH_WATER_MARK) {
-            cerr << ctx->client_fd << ":\n这个客户端是一个慢客户端，先踢掉了\n";
+            std::cerr << ctx->client_fd << ":\n这个客户端是一个慢客户端，先踢掉了\n";
             close_client(epoll_fd, ctx);
             return;
         }
@@ -73,7 +86,7 @@ void send_data(int epoll_fd, struct ClientContext* ctx, const char* data, size_t
             //内核缓冲区满了
             ctx->send_buffer.append(data, len);
             if (ctx->send_buffer.readableBytes() > HIGH_WATER_MARK) {
-            cerr << ctx->client_fd << ":\n这个客户端是一个慢客户端，先踢掉了\n";
+            std::cerr << ctx->client_fd << ":\n这个客户端是一个慢客户端，先踢掉了\n";
             close_client(epoll_fd, ctx);
             return;
         }
@@ -99,11 +112,11 @@ void handle_write(int epoll_fd, struct ClientContext* ctx) {
     std::vector<char> data(wait_send);
     ctx->send_buffer.peek(data.data(), wait_send);
     ssize_t sent = write(ctx->client_fd, data.data(), wait_send);
-    if (sent == wait_send) {
+    if (sent >= 0 && static_cast<size_t>(sent) == wait_send) {
         ctx->send_buffer.retrieve(wait_send);
         update_epollout(epoll_fd, ctx);
     }
-    else if (sent >= 0 && sent < wait_send) {
+    else if (sent >= 0 && static_cast<size_t>(sent) < wait_send) {
         ctx->send_buffer.retrieve(sent);
     }
     else {
@@ -180,22 +193,16 @@ int main() {
         //获取目前就绪的事件列表
         int ready_num = epoll_wait(epoll_fd, events, MAX_EVENTS, 5000);
 
-        //心跳保活实现
+        //时间轮心跳保活
         time_t now = time(nullptr);
-        for (auto it = clients.begin(); it != clients.end(); ) {
-            int fd = it->first;
-            time_t last_active = it->second.last_active_time;
-
-            if (now - last_active > 30) {//30秒算超时
-                std::cerr << "客户端：" << fd << "心跳超时，连接断开\n";
-                //这里关闭client连接没有使用close_client函数是因为要保留erase返回的迭代器
-                epoll_ctl(epoll_fd, EPOLL_CTL_DEL, fd, nullptr);
-                close(fd);
-                it = clients.erase(it);//因为删除操作会使后续的迭代器失效，erase会返回后续的迭代器，必须要用一个变量接住！！！
-            }
-            else {
-                it++;
-            }
+        while (!timer_heap.empty()) {
+            TimerEntry time_top = timer_heap.top();
+            if (now < time_top.expire) break;
+            timer_heap.pop();
+            if (clients.find(time_top.fd) == clients.end()) continue;
+            if (clients[time_top.fd].last_active_time + 30 > now) continue;
+            close_client(epoll_fd, &clients[time_top.fd]);
+                
         }
         
         //开始在循环处理这次的就绪事件
@@ -224,6 +231,7 @@ int main() {
                     setNonBlocking(client_fd);
                     clients.emplace(client_fd, ClientContext{});//为新连接上的客户端分配缓冲区,默认缓冲区大小是8kb
                     clients[client_fd].client_fd = client_fd;
+                    timer_heap.push({time(nullptr) + 30, client_fd});
                     struct epoll_event client_event{};
                     client_event.events = EPOLLIN | EPOLLET;
                     client_event.data.fd = client_fd;
@@ -245,6 +253,7 @@ int main() {
                     if (bytes_read > 0) {
                         RingBuffer& rb = clients[client_fd].recv_buffer;
                         clients[client_fd].last_active_time = time(nullptr);
+                        timer_heap.push({time(nullptr) + 30, client_fd});
                         rb.append(buffer, bytes_read);
                         while (true) {
                             //状态A:解析包头
