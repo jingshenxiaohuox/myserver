@@ -31,7 +31,17 @@ struct ClientContext {
     int client_fd;
     time_t last_active_time; //上一次活跃时间
 
-    ClientContext() : recv_buffer(8192), send_buffer(8192), client_fd(-1), last_active_time(time(nullptr)) {}
+    enum class Role {Unknow, Collector, Monitor} role = Role::Unknow;
+    uint16_t device_id = 0;
+
+    //采集端：谁订阅了我
+    std::vector<int> subscribers;
+
+    //监控端：我订阅了谁
+    std::vector<int> subscribed_to;
+
+    ClientContext() : recv_buffer(8192), send_buffer(8192), client_fd(-1), last_active_time(time(nullptr)),
+                      role(Role::Unknow), device_id(0), subscribers(), subscribed_to() {}
 };
 
 std::unordered_map<int, ClientContext> clients;
@@ -132,8 +142,7 @@ void handle_write(int epoll_fd, struct ClientContext* ctx) {
 
 }
 
-
-
+std::unordered_map<uint16_t, int> device_id_to_fd;
 int main() {
     signal(SIGPIPE, SIG_IGN);
     //创建一个TCP套接字
@@ -295,6 +304,30 @@ int main() {
                             //判断是否是心跳包
                             if (ntohs(header.type) == static_cast<uint16_t>(MsgType::HeartBeat)) {
                                 send_data(epoll_fd, ctx, reinterpret_cast<char*>(&header),sizeof(header));
+                            }
+                            else if (ntohs(header.type) == static_cast<uint16_t>(MsgType::RegisterCollector)) {
+                                ctx->role = ClientContext::Role::Collector;
+                                ctx->device_id = ntohs(header.id);
+                                cout << "id: " << ctx->device_id << "成功注册为采集端\n";
+                                device_id_to_fd.emplace(ctx->device_id, ctx->client_fd);
+
+                            }
+                            else if (ntohs(header.type) == static_cast<uint16_t>(MsgType::RegisterMonitor)) {
+                                ctx->role = ClientContext::Role::Monitor;
+                                ctx->device_id = ntohs(header.id);
+                                cout << "id: " << ctx->device_id << "成功注册为监控端\n";
+                                if (device_id_to_fd.find(ctx->device_id) == device_id_to_fd.end()) {
+                                    cout << "试图订阅的采集端不存在!!!\n";//这个信息其实应该发给订阅端,不知道怎么直接发送一串字符串
+                                    break;
+                                }
+                                clients[device_id_to_fd[ctx->device_id]].subscribers.push_back(ctx->client_fd);
+                                ctx->subscribed_to.push_back(device_id_to_fd[ctx->device_id]);
+
+                            }
+                            else if (ntohs(header.type) == static_cast<uint16_t>(MsgType::VideoFrame)) {
+                                for (int sub_fd : ctx->subscribers) {
+                                    send_data(epoll_fd, &clients[sub_fd], full_packet.data(), total_packet_size);
+                                }
                             }
                             
                         }

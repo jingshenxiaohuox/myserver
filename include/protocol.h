@@ -7,6 +7,8 @@ static constexpr uint32_t MAX_PAYLOAD_SIZE = 4 * 1024 * 1024; //4MB
 enum class MsgType : uint16_t {
     HeartBeat = 0x0001,
     VideoFrame = 0x0002,
+    RegisterCollector = 0x0003,//告诉网关自己是采集端
+    RegisterMonitor = 0x0004,//告诉网关自己是监控端
 };
 
 
