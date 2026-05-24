@@ -1,0 +1,1 @@
+/usr/bin/c++  -Wall -Wextra -g -O0 CMakeFiles/bench_client.dir/test/bench_client.cpp.o CMakeFiles/bench_client.dir/src/ringbuffer.cpp.o CMakeFiles/bench_client.dir/src/protocol.cpp.o -o bench_client 

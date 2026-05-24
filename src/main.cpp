@@ -13,11 +13,13 @@
 #include <vector>
 #include <queue>
 #include <csignal>
+#include <algorithm>
 
 
 const int MAX_EVENTS = 1024; //定义最大事件数为1024
 const int PORT = 8081; //定义服务器监听的端口号为8081
 static constexpr size_t HIGH_WATER_MARK = 6144;
+std::unordered_map<uint16_t, int> device_id_to_fd;
 
 
 void setNonBlocking(int fd) { //定义一个函数用于设置文件描述符为非阻塞模式
@@ -72,6 +74,20 @@ void update_epollout(int epoll_fd, struct ClientContext* ctx) {
 void close_client(int epoll_fd, struct ClientContext* ctx) {
     epoll_ctl(epoll_fd, EPOLL_CTL_DEL, ctx->client_fd, nullptr);
     close(ctx->client_fd);
+    if (ctx->role == ClientContext::Role::Monitor) {
+        for (int subscribed_fd : ctx->subscribed_to) {
+            ClientContext* ctx_m = &clients[subscribed_fd];
+            ctx_m->subscribers.erase(std::remove(ctx_m->subscribers.begin(), ctx_m->subscribers.end(), ctx_m->client_fd), ctx_m->subscribers.end());
+        }
+    }
+    else if (ctx->role == ClientContext::Role::Collector) {
+        for (int subscriber_fd : ctx->subscribers) {
+            ClientContext* ctx_m = &clients[subscriber_fd];
+            ctx_m->subscribed_to.erase(std::remove(ctx_m->subscribed_to.begin(), ctx_m->subscribed_to.end(), ctx_m->client_fd), ctx_m->subscribed_to.end());
+
+        }
+    }
+    device_id_to_fd.erase(ctx->device_id);
     clients.erase(ctx->client_fd);
 }
 
@@ -142,7 +158,7 @@ void handle_write(int epoll_fd, struct ClientContext* ctx) {
 
 }
 
-std::unordered_map<uint16_t, int> device_id_to_fd;
+
 int main() {
     signal(SIGPIPE, SIG_IGN);
     //创建一个TCP套接字
@@ -308,16 +324,16 @@ int main() {
                             else if (ntohs(header.type) == static_cast<uint16_t>(MsgType::RegisterCollector)) {
                                 ctx->role = ClientContext::Role::Collector;
                                 ctx->device_id = ntohs(header.id);
-                                cout << "id: " << ctx->device_id << "成功注册为采集端\n";
+                                std::cout << "id: " << ctx->device_id << "成功注册为采集端\n";
                                 device_id_to_fd.emplace(ctx->device_id, ctx->client_fd);
 
                             }
                             else if (ntohs(header.type) == static_cast<uint16_t>(MsgType::RegisterMonitor)) {
                                 ctx->role = ClientContext::Role::Monitor;
                                 ctx->device_id = ntohs(header.id);
-                                cout << "id: " << ctx->device_id << "成功注册为监控端\n";
+                                std::cout << "id: " << ctx->device_id << "成功注册为监控端\n";
                                 if (device_id_to_fd.find(ctx->device_id) == device_id_to_fd.end()) {
-                                    cout << "试图订阅的采集端不存在!!!\n";//这个信息其实应该发给订阅端,不知道怎么直接发送一串字符串
+                                    std::cout << "试图订阅的采集端不存在!!!\n";//这个信息其实应该发给订阅端,不知道怎么直接发送一串字符串
                                     break;
                                 }
                                 clients[device_id_to_fd[ctx->device_id]].subscribers.push_back(ctx->client_fd);

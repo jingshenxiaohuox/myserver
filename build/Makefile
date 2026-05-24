@@ -129,6 +129,19 @@ gateway_server/fast:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/gateway_server.dir/build.make CMakeFiles/gateway_server.dir/build
 .PHONY : gateway_server/fast
 
+#=============================================================================
+# Target rules for targets named bench_client
+
+# Build rule for target.
+bench_client: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 bench_client
+.PHONY : bench_client
+
+# fast build rule for target.
+bench_client/fast:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/bench_client.dir/build.make CMakeFiles/bench_client.dir/build
+.PHONY : bench_client/fast
+
 src/main.o: src/main.cpp.o
 .PHONY : src/main.o
 
@@ -159,6 +172,7 @@ src/protocol.o: src/protocol.cpp.o
 # target to build an object file
 src/protocol.cpp.o:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/gateway_server.dir/build.make CMakeFiles/gateway_server.dir/src/protocol.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/bench_client.dir/build.make CMakeFiles/bench_client.dir/src/protocol.cpp.o
 .PHONY : src/protocol.cpp.o
 
 src/protocol.i: src/protocol.cpp.i
@@ -167,6 +181,7 @@ src/protocol.i: src/protocol.cpp.i
 # target to preprocess a source file
 src/protocol.cpp.i:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/gateway_server.dir/build.make CMakeFiles/gateway_server.dir/src/protocol.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/bench_client.dir/build.make CMakeFiles/bench_client.dir/src/protocol.cpp.i
 .PHONY : src/protocol.cpp.i
 
 src/protocol.s: src/protocol.cpp.s
@@ -175,6 +190,7 @@ src/protocol.s: src/protocol.cpp.s
 # target to generate assembly for a file
 src/protocol.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/gateway_server.dir/build.make CMakeFiles/gateway_server.dir/src/protocol.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/bench_client.dir/build.make CMakeFiles/bench_client.dir/src/protocol.cpp.s
 .PHONY : src/protocol.cpp.s
 
 src/ringbuffer.o: src/ringbuffer.cpp.o
@@ -183,6 +199,7 @@ src/ringbuffer.o: src/ringbuffer.cpp.o
 # target to build an object file
 src/ringbuffer.cpp.o:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/gateway_server.dir/build.make CMakeFiles/gateway_server.dir/src/ringbuffer.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/bench_client.dir/build.make CMakeFiles/bench_client.dir/src/ringbuffer.cpp.o
 .PHONY : src/ringbuffer.cpp.o
 
 src/ringbuffer.i: src/ringbuffer.cpp.i
@@ -191,6 +208,7 @@ src/ringbuffer.i: src/ringbuffer.cpp.i
 # target to preprocess a source file
 src/ringbuffer.cpp.i:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/gateway_server.dir/build.make CMakeFiles/gateway_server.dir/src/ringbuffer.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/bench_client.dir/build.make CMakeFiles/bench_client.dir/src/ringbuffer.cpp.i
 .PHONY : src/ringbuffer.cpp.i
 
 src/ringbuffer.s: src/ringbuffer.cpp.s
@@ -199,7 +217,32 @@ src/ringbuffer.s: src/ringbuffer.cpp.s
 # target to generate assembly for a file
 src/ringbuffer.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/gateway_server.dir/build.make CMakeFiles/gateway_server.dir/src/ringbuffer.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/bench_client.dir/build.make CMakeFiles/bench_client.dir/src/ringbuffer.cpp.s
 .PHONY : src/ringbuffer.cpp.s
+
+test/bench_client.o: test/bench_client.cpp.o
+.PHONY : test/bench_client.o
+
+# target to build an object file
+test/bench_client.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/bench_client.dir/build.make CMakeFiles/bench_client.dir/test/bench_client.cpp.o
+.PHONY : test/bench_client.cpp.o
+
+test/bench_client.i: test/bench_client.cpp.i
+.PHONY : test/bench_client.i
+
+# target to preprocess a source file
+test/bench_client.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/bench_client.dir/build.make CMakeFiles/bench_client.dir/test/bench_client.cpp.i
+.PHONY : test/bench_client.cpp.i
+
+test/bench_client.s: test/bench_client.cpp.s
+.PHONY : test/bench_client.s
+
+# target to generate assembly for a file
+test/bench_client.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/bench_client.dir/build.make CMakeFiles/bench_client.dir/test/bench_client.cpp.s
+.PHONY : test/bench_client.cpp.s
 
 # Help Target
 help:
@@ -209,6 +252,7 @@ help:
 	@echo "... depend"
 	@echo "... edit_cache"
 	@echo "... rebuild_cache"
+	@echo "... bench_client"
 	@echo "... gateway_server"
 	@echo "... src/main.o"
 	@echo "... src/main.i"
@@ -219,6 +263,9 @@ help:
 	@echo "... src/ringbuffer.o"
 	@echo "... src/ringbuffer.i"
 	@echo "... src/ringbuffer.s"
+	@echo "... test/bench_client.o"
+	@echo "... test/bench_client.i"
+	@echo "... test/bench_client.s"
 .PHONY : help
 
 

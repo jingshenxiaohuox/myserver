@@ -13,7 +13,13 @@ add_executable(gateway_server
     src/ringbuffer.cpp
     src/protocol.cpp
 )
+add_executable(bench_client
+    test/bench_client.cpp
+    src/ringbuffer.cpp
+    src/protocol.cpp
+)
 
+target_include_directories(bench_client PRIVATE include)
 target_include_directories(gateway_server PRIVATE include)
 
 
