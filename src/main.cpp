@@ -42,7 +42,7 @@ struct ClientContext {
     //监控端：我订阅了谁
     std::vector<int> subscribed_to;
 
-    ClientContext() : recv_buffer(8192), send_buffer(8192), client_fd(-1), last_active_time(time(nullptr)),
+    ClientContext() : recv_buffer(128 * 1024), send_buffer(128 * 1024), client_fd(-1), last_active_time(time(nullptr)),
                       role(Role::Unknow), device_id(0), subscribers(), subscribed_to() {}
 };
 
@@ -77,17 +77,17 @@ void close_client(int epoll_fd, struct ClientContext* ctx) {
     if (ctx->role == ClientContext::Role::Monitor) {
         for (int subscribed_fd : ctx->subscribed_to) {
             ClientContext* ctx_m = &clients[subscribed_fd];
-            ctx_m->subscribers.erase(std::remove(ctx_m->subscribers.begin(), ctx_m->subscribers.end(), ctx_m->client_fd), ctx_m->subscribers.end());
+            ctx_m->subscribers.erase(std::remove(ctx_m->subscribers.begin(), ctx_m->subscribers.end(), ctx->client_fd), ctx_m->subscribers.end());
         }
     }
     else if (ctx->role == ClientContext::Role::Collector) {
         for (int subscriber_fd : ctx->subscribers) {
             ClientContext* ctx_m = &clients[subscriber_fd];
-            ctx_m->subscribed_to.erase(std::remove(ctx_m->subscribed_to.begin(), ctx_m->subscribed_to.end(), ctx_m->client_fd), ctx_m->subscribed_to.end());
-
+            ctx_m->subscribed_to.erase(std::remove(ctx_m->subscribed_to.begin(), ctx_m->subscribed_to.end(), ctx->client_fd), ctx_m->subscribed_to.end());
         }
+        device_id_to_fd.erase(ctx->device_id);
     }
-    device_id_to_fd.erase(ctx->device_id);
+    
     clients.erase(ctx->client_fd);
 }
 
@@ -101,7 +101,7 @@ void send_data(int epoll_fd, struct ClientContext* ctx, const char* data, size_t
         //没发完
         ctx->send_buffer.append(data + sent, len - sent);
         if (ctx->send_buffer.readableBytes() > HIGH_WATER_MARK) {
-            std::cerr << ctx->client_fd << ":\n这个客户端是一个慢客户端，先踢掉了\n";
+            std::cerr << ctx->client_fd << ":这个客户端是一个慢客户端，先踢掉了\n";
             close_client(epoll_fd, ctx);
             return;
         }
@@ -226,8 +226,9 @@ int main() {
             timer_heap.pop();
             if (clients.find(time_top.fd) == clients.end()) continue;
             if (clients[time_top.fd].last_active_time + 30 > now) continue;
+            std::cout << time_top.fd << "是不是没心跳了?直接踢掉\n";
             close_client(epoll_fd, &clients[time_top.fd]);
-                
+                            
         }
         
         //开始在循环处理这次的就绪事件
@@ -262,13 +263,13 @@ int main() {
                     client_event.data.fd = client_fd;
                     epoll_ctl(epoll_fd, EPOLL_CTL_ADD, client_fd, &client_event);
                     
-
+                    // std::cout << "卡死在265行了";
                 }
             }
             else if (events[i].events & EPOLLIN) {//epollin是读事件，有数据发进来了
                 int client_fd = events[i].data.fd;
                 struct ClientContext* ctx = &clients[client_fd];
-                char buffer[1024];//把从内核传过来的数据暂时放到缓冲区当中
+                char buffer[64 * 1024];//把从内核传过来的数据暂时放到缓冲区当中
                 bool connection_closed = false;
 
                 //因为是边缘触发模式，必须要用一个while循环一次读完
@@ -313,9 +314,9 @@ int main() {
                             rb.peek(full_packet.data(), total_packet_size);
                             rb.retrieve(total_packet_size);
 
-                            std::cout << "成功解包! 文件描述符: " << client_fd
-                                      << " 业务类型: " << ntohs(header.type)
-                                      << " 包体长度: " << body_length << "字节\n";
+                            // std::cout << "成功解包! 文件描述符: " << client_fd
+                            //           << " 业务类型: " << ntohs(header.type)
+                            //           << " 包体长度: " << body_length << "字节\n";
                             
                             //判断是否是心跳包
                             if (ntohs(header.type) == static_cast<uint16_t>(MsgType::HeartBeat)) {
@@ -345,6 +346,7 @@ int main() {
                                     send_data(epoll_fd, &clients[sub_fd], full_packet.data(), total_packet_size);
                                 }
                             }
+                            // std::cout << "卡死在348行了";
                             
                         }
                     }
@@ -367,9 +369,9 @@ int main() {
                         break; 
                     }
                     else {
-                        std::cout << "收到数据: " << bytes_read << "字节" << "数据来自" << client_fd << " 数据内容:" << buffer << "\n";
+                        // std::cout << "收到数据: " << bytes_read << "字节" << "数据来自" << client_fd << "\n";
                     }
-                    
+                    // std::cout<< "卡死在373行了";
                 }
                 
             }
