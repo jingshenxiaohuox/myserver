@@ -18,7 +18,7 @@
 
 const int MAX_EVENTS = 1024; //定义最大事件数为1024
 const int PORT = 8081; //定义服务器监听的端口号为8081
-static constexpr size_t HIGH_WATER_MARK = 6144;
+static constexpr size_t HIGH_WATER_MARK = 1 * 1024 * 1024;
 std::unordered_map<uint16_t, int> device_id_to_fd;
 
 
