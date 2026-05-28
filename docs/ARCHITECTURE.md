@@ -213,9 +213,12 @@ const size_t HIGH_WATER_MARK = 6144; // ⚠️ 见已知问题
 
 | # | 问题 | 位置 | 风险 |
 |---|------|------|------|
-| 1 | `HIGH_WATER_MARK = 6144`（6KB）远小于单帧 64KB | main.cpp:21 | 发送 VideoFrame 时会立即触发高水位，把监控端踢掉 |
+| 1 | ~~`HIGH_WATER_MARK = 6144`（6KB）远小于单帧 64KB~~ | ~~main.cpp:21~~ | ✅ 已修复，调整为 1MB |
 | 2 | `full_packet` 在 main() 作用域声明，跨整个事件循环复用 | main.cpp:212 | 非重入，如果未来多线程会有竞态；单线程下安全但语义不清晰 |
 | 3 | timer_heap 每次 recv 都 push 一个新条目，不做去重 | main.cpp:282 | 长连接下堆无限增长，内存泄漏风险 |
+| 11 | `send_buffer` 只有 128KB，单帧 64KB，两帧即满 | main.cpp ClientContext | N路并发转发时 EAGAIN 后 append 立即溢出，数据静默丢失 |
+| 12 | `RingBuffer::append` 溢出时静默丢弃，返回 void | ringbuffer.h/cpp | 调用方无法感知写入失败，HIGH_WATER_MARK 逻辑完全失效 |
+| 13 | `send_buffer` 溢出后 HIGH_WATER_MARK 检查永远不触发 | main.cpp send_data | 应踢掉的慢客户端未被踢，数据丢失但连接保留，行为不可预期 |
 
 ### 🟡 中优先级
 
@@ -241,8 +244,9 @@ const size_t HIGH_WATER_MARK = 6144; // ⚠️ 见已知问题
 | 文件 | 用途 | 状态 |
 |------|------|------|
 | test/test.py | 单采集端 + 单监控端功能验证 + 吞吐量测试 | ✅ 可用 |
-| test/bench_client.cpp | C++ 高并发压测客户端 | ❌ 空壳待实现 |
-| test/1_to_n.py | 1 采集端对 N 监控端扇出压测 | ❌ 空文件待实现 |
+| test/bench_client.cpp | C++ 高并发压测客户端 | ❌ 空壳待实现(暂时不需要用到) | 
+| test/1_to_n.py | 1 采集端对 N 监控端扇出压测 | ❌ 空文件待实现 |✅️已实现
+| test/n_to_n.py | N采集端对N监控端全矩阵压测 | ✅ 可用（已发现上述 #11~#13）|
 
 ---
 
@@ -271,8 +275,11 @@ myserver/
 进入 Phase 1 前，建议先完成以下重构：
 
 1. **拆分 main.cpp** → Server 类 / EventLoop 类 / Connection 类
-2. **修复 HIGH_WATER_MARK**，调整为至少 1MB 以支持视频帧
-3. **修复 timer_heap 无限增长问题**
+2. **修复 HIGH_WATER_MARK**，调整为至少 4MB 以支持视频帧
+3. **RingBuffer::append 改为返回 bool**：让上层能感知写入失败
+4. **send_data 失败时正确触发 close_client**：使 HIGH_WATER_MARK 真正生效
+5. **拆分 main.cpp** → Server 类 / EventLoop 类 / Connection 类
+6. **修复 timer_heap 无限增长问题**
 
 Phase 1 新增模块：
 ```
