@@ -111,21 +111,28 @@ def main():
 
     for t in threads:
         t.join()
-        
+
     for sock in collectors:
         try:
             sock.shutdown(socket.SHUT_RDWR)
+            sock.close()
         except Exception:
             pass
-    
-    for t in threads_m:
-        t.join()
-        
+
+    # ★ 关键：给在途数据一点时间到达 Monitor
+    time.sleep(5)
+
+    # ★ 先关 Monitor socket，让 recv() 解除阻塞
     for sock in monitors:
         try:
             sock.shutdown(socket.SHUT_RDWR)
+            sock.close()
         except Exception:
             pass
+
+    # 现在 Monitor 线程的 recv() 会返回 b''，线程自然退出
+    for t in threads_m:
+        t.join()
 
 
     # 6. 汇总输出
