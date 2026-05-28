@@ -19,6 +19,16 @@ def build_packet(msg_type, device_id, body=b''):
     )
     return header + body
 
+def collector_sender(sock, device_id, m, result):
+    start = time.time()
+    for i in range(m):
+        sock.sendall(build_packet(2, device_id, b'x' * 64 * 1024))
+    elapsed = time.time() - start
+
+    result[device_id] = {
+        'elapsed': elapsed
+    }
+
 def monitor_receiver(monitor_id, sock, total_frames, result):
     """每个 Monitor 独立接收线程"""
     total_bytes = 0
@@ -56,66 +66,71 @@ def monitor_receiver(monitor_id, sock, total_frames, result):
     }
 
 def main():
-    parser = argparse.ArgumentParser(description='1-to-N 扇出压测')
-    parser.add_argument('-n', type=int, default=2,   help='Monitor 数量（默认2）')
-    parser.add_argument('-m', type=int, default=1000, help='发送帧数（默认1000）')
-    args = parser.parse_args()
+    parser = argparse.ArgumentParser(description='N-to-N')
+    parser.add_argument('-n', type=int, default=2,   help='Collector和Monitor 数量（默认2）')
+    parser.add_argument('-m', type=int, default=2,   help='每个Collector发送的帧数（默认1000）')
 
+    args = parser.parse_args()
     N = args.n
     M = args.m
-    DEVICE_ID = 1
-
-    print(f"压测参数：1 Collector → {N} Monitor，发送 {M} 帧（每帧 64KB）")
+    print(f"压测参数：{N} Collector → {N} Monitor，发送 {M} 帧（每帧 64KB）")
     print(f"预计总发送量：{M * 64 / 1024:.1f} MB，预计总转发量：{M * N * 64 / 1024:.1f} MB\n")
 
-    # 1. 连接并注册 Collector
-    collector = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    collector.connect(('127.0.0.1', 8081))
-    collector.sendall(build_packet(3, DEVICE_ID))
-    print(f"Collector 注册成功（device_id={DEVICE_ID}）")
+    collectors = []
+    for i in range(N):
+        collector = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        collector.connect(('127.0.0.1', 8081))
+        collector.sendall(build_packet(3, i + 1))
+        collectors.append(collector)
+        print(f"Collector 注册成功（device_id={i + 1}）")
+    time.sleep(0.1)
 
-    # 2. 连接并注册 N 个 Monitor
     monitors = []
     for i in range(N):
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.connect(('127.0.0.1', 8081))
-        sock.sendall(build_packet(4, DEVICE_ID))
+        sock.sendall(build_packet(4, i + 1))
         monitors.append(sock)
         print(f"Monitor {i+1} 注册成功")
 
-    time.sleep(0.5)  # 等待注册完成
-
-    # 3. 启动所有 Monitor 接收线程
     results = {}
     threads = []
-    for i, sock in enumerate(monitors):
-        t = threading.Thread(target=monitor_receiver, args=(i+1, sock, M, results))
+    for i, sock in enumerate(collectors):
+        t = threading.Thread(target=collector_sender, args=(sock, i + 1, M, results))
         t.daemon = True
         t.start()
         threads.append(t)
 
-    # 4. Collector 发包
-    print(f"\n开始发送 {M} 帧...")
-    frame_body = b'x' * (64 * 1024)
-    send_start = time.time()
-    for _ in range(M):
-        collector.sendall(build_packet(2, DEVICE_ID, frame_body))
-    send_elapsed = time.time() - send_start
-    collector.close()
-    print(f"发送完成，耗时 {send_elapsed:.2f}s")
+    results_m = {}
+    threads_m = []
+    for i, sock in enumerate(monitors):
+        t = threading.Thread(target=monitor_receiver, args=(i + 1, sock, M, results_m))
+        t.daemon = True
+        t.start()
+        threads_m.append(t)
 
-    # 5. 等待所有 Monitor 接收完毕
-    time.sleep(0.5)
+    for t in threads:
+        t.join()
+        
+    for sock in collectors:
+        try:
+            sock.shutdown(socket.SHUT_RDWR)
+        except Exception:
+            pass
+    
+    for t in threads_m:
+        t.join()
+        
     for sock in monitors:
         try:
             sock.shutdown(socket.SHUT_RDWR)
         except Exception:
             pass
-    for t in threads:
-        t.join(timeout=10)
+
 
     # 6. 汇总输出
     print("\n========== 压测结果 ==========")
+    send_elapsed = max(results[i]['elapsed'] for i in results if results[i]['elapsed'] > 0)
     send_throughput = (M * (HEADER_SIZE + 64 * 1024)) / send_elapsed / 1024 / 1024
     print(f"发送吞吐量:   {send_throughput:.2f} MB/s")
     print()
@@ -123,7 +138,7 @@ def main():
     total_recv_bytes  = 0
     total_recv_frames = 0
     for i in range(1, N + 1):
-        r = results.get(i)
+        r = results_m.get(i)
         if not r or r['elapsed'] == 0:
             print(f"Monitor {i}: 未收到数据")
             continue
@@ -138,11 +153,14 @@ def main():
 
     print()
     if total_recv_frames > 0:
-        total_elapsed = max(results[i]['elapsed'] for i in results if results[i]['elapsed'] > 0)
+        total_elapsed = max(results_m[i]['elapsed'] for i in results_m if results_m[i]['elapsed'] > 0)
         total_throughput = total_recv_bytes / total_elapsed / 1024 / 1024
         print(f"网关总转发吞吐量: {total_throughput:.2f} MB/s（{N} 个 Monitor 合计）")
 
     print("================================")
+    
 
 if __name__ == '__main__':
     main()
+    
+
