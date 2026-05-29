@@ -303,6 +303,48 @@ myserver/
 
 ---
 
+## #5 重构计划：拆分 main.cpp
+
+### 目标三个类
+
+- `Connection` ← ClientContext 的替代，头文件已设计完成
+- `Server`     ← 管理所有连接 + 订阅关系 + 路由逻辑
+- `EventLoop`  ← epoll 事件循环 + 定时器
+
+### 代码归属映射
+```
+setNonBlocking()          → EventLoop 或工具函数
+socket/bind/listen/accept → Server
+epoll_create/epoll_wait   → EventLoop
+timer_heap                → EventLoop
+ClientContext             → Connection
+clients map               → Server
+device_id_to_fd           → Server
+send_data()               → Connection::send()
+handle_write()            → Connection::handleWrite()
+update_epollout()         → Connection::updateEpollout()
+close_client()            → ~Connection() + on_close_ 回调
+TLV 状态机                → Connection::handleRead()
+心跳/注册/路由业务逻辑    → Server 的 on_message_ 回调
+```
+
+### 重构完成后 main.cpp 只剩
+```cpp
+int main() {
+    EventLoop loop;
+    Server server(8081, &loop);
+    server.start();
+    loop.run();
+}
+```
+
+### 当前进度
+- [x] Connection.h 设计完成
+- [ ] Connection.cpp
+- [ ] Server.h / Server.cpp
+- [ ] EventLoop.h / EventLoop.cpp
+- [ ] main.cpp 瘦身
+
 ## Phase 1 预规划（Modbus TCP / MQTT）
 
 进入 Phase 1 前，建议先完成以下重构：
