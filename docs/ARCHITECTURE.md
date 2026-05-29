@@ -69,8 +69,8 @@ Phase 4：边缘 AI 能力（ONNX Runtime / TensorRT）
 
 ### 待完成（Phase 0 收尾）
 
-- [ ] `bench_client.cpp`：基准测试客户端（当前为空壳）
-- [ ] `1_to_n.py`：1 采集端对 N 监控端压测脚本（当前为空）
+- [目前用不到] `bench_client.cpp`：基准测试客户端（当前为空壳）
+- [已完成] `1_to_n.py`：1 采集端对 N 监控端压测脚本
 - [ ] 无锁线程安全发送队列（为 Phase 2 多线程做准备）
 
 ---
@@ -104,7 +104,7 @@ enum class MsgType : uint16_t {
 };
 ```
 
-### ClientContext（连接级上下文）
+### ClientContext（连接级上下文）⚠️待替换为Connection类
 
 ```cpp
 struct ClientContext {
@@ -122,7 +122,40 @@ struct ClientContext {
     std::vector<int> subscribed_to;
 };
 ```
+### Connection (ClientContext 重构后的替代,进行中)
+```cpp
+#pragma once
+#include 
+#include 
+#include "ringbuffer.h"
 
+class Connection {
+public:
+    enum class Role { Unknow, Collector, Monitor };
+
+    Connection(int fd, int epoll_fd);
+    ~Connection();  // epoll_ctl DEL + close(fd_)
+
+    void handleRead();   // TLV 状态机 + 触发 on_message_
+    void handleWrite();  // 消费 send_buffer
+    void send(const char* data, size_t len);
+
+    std::function on_message_;
+    std::function on_close_;
+
+    int fd_;
+    int epoll_fd_;
+    Role role_ = Role::Unknow;
+    uint16_t device_id_ = 0;
+    time_t last_active_time_;
+
+private:
+    RingBuffer recv_buffer_;
+    RingBuffer send_buffer_;
+    void updateEpollout();
+};
+```
+> subscribers / subscribed_to 移至 Server 统一管理
 ### RingBuffer（核心收发缓冲）
 
 ```
@@ -211,22 +244,22 @@ const size_t HIGH_WATER_MARK = 6144; // ⚠️ 见已知问题
 
 ### 🔴 高优先级
 
-| # | 问题 | 位置 | 风险 |
-|---|------|------|------|
+| # | 问题 | 位置 | 风险 | 修复方案 |
+|---|------|------|------|--------|
 | 1 | ~~`HIGH_WATER_MARK = 6144`（6KB）远小于单帧 64KB~~ | ~~main.cpp:21~~ | ✅ 已修复，调整为 1MB |
-| 2 | `full_packet` 在 main() 作用域声明，跨整个事件循环复用 | main.cpp:212 | 非重入，如果未来多线程会有竞态；单线程下安全但语义不清晰 |
-| 3 | timer_heap 每次 recv 都 push 一个新条目，不做去重 | main.cpp:282 | 长连接下堆无限增长，内存泄漏风险 |
-| 11 | `send_buffer` 只有 128KB，单帧 64KB，两帧即满 | main.cpp ClientContext | N路并发转发时 EAGAIN 后 append 立即溢出，数据静默丢失 |
-| 12 | `RingBuffer::append` 溢出时静默丢弃，返回 void | ringbuffer.h/cpp | 调用方无法感知写入失败，HIGH_WATER_MARK 逻辑完全失效 |
-| 13 | `send_buffer` 溢出后 HIGH_WATER_MARK 检查永远不触发 | main.cpp send_data | 应踢掉的慢客户端未被踢，数据丢失但连接保留，行为不可预期 |
+| 2 | ~~`full_packet` 在 main() 作用域声明，跨整个事件循环复用~~ | ~~main.cpp:212~~ | ✅️非重入，如果未来多线程会有竞态；单线程下安全但语义不清晰 | 定义代码放在了状态C成功解包下面
+| 3 | ~~timer_heap 每次 recv 都 push 一个新条目，不做去重~~ | ~~main.cpp:282~~ | ✅️长连接下堆无限增长，内存泄漏风险 | 把本来再recv地方push新timer_heap条目的代码删除了
+| 11 | ~~`send_buffer` 只有 128KB，单帧 64KB，两帧即满~~ | ~~main.cpp ClientContext~~ | ✅️N路并发转发时 EAGAIN 后 append 立即溢出，数据静默丢失 |修改send_buffer为4MB|
+| 12 | ~~`RingBuffer::append` 溢出时静默丢弃，返回 void~~ | ~~ringbuffer.h/cpp~~ | ✅️调用方无法感知写入失败，HIGH_WATER_MARK 逻辑完全失效 |改为bool返回类型|
+| 13 | ~~`send_buffer` 溢出后 HIGH_WATER_MARK 检查永远不触发~~ | ~~main.cpp send_data~~ | ✅️应踢掉的慢客户端未被踢，数据丢失但连接保留，行为不可预期 |设置水位线低于send_buffer容量|
 
 ### 🟡 中优先级
 
 | # | 问题 | 位置 | 风险 |
 |---|------|------|------|
-| 4 | `isValidHeader()` 在 protocol.cpp 定义但 main.cpp 中未使用 | protocol.cpp | 代码冗余，逻辑分散（main.cpp 自己做 magic 校验）|
+| 4 | ~~`isValidHeader()` 在 protocol.cpp 定义但 main.cpp 中未使用~~ | ~~protocol.cpp~~ | ✅️代码冗余，逻辑分散（main.cpp 自己做 magic 校验）|
 | 5 | main.cpp 约 400 行，所有逻辑混在一个文件 | main.cpp | 模块边界不清，Phase 1 接入新协议时难以维护 |
-| 6 | `send_data` 和 `handle_write` 存在逻辑重叠 | main.cpp:94/129 | 部分发送路径不一致，存在 send_buffer 双重操作风险 |
+| 6 | ~~`send_data` 和 `handle_write` 存在逻辑重叠~~ | ~~main.cpp:94/129~~ | ✅️部分发送路径不一致，存在 send_buffer 双重操作风险 |
 | 7 | 日志全用 `std::cerr/cout`，无级别无时间戳 | 全局 | 生产环境无法使用，定位问题困难 |
 
 ### 🟢 低优先级（Phase 1 前处理即可）

@@ -42,7 +42,7 @@ struct ClientContext {
     //监控端：我订阅了谁
     std::vector<int> subscribed_to;
 
-    ClientContext() : recv_buffer(128 * 1024), send_buffer(128 * 1024), client_fd(-1), last_active_time(time(nullptr)),
+    ClientContext() : recv_buffer(4 * 1024 * 1024), send_buffer(4 * 1024 * 1024), client_fd(-1), last_active_time(time(nullptr)),
                       role(Role::Unknow), device_id(0), subscribers(), subscribed_to() {}
 };
 
@@ -92,31 +92,61 @@ void close_client(int epoll_fd, struct ClientContext* ctx) {
 }
 
 void send_data(int epoll_fd, struct ClientContext* ctx, const char* data, size_t len) {
+    if (!ctx->send_buffer.empty()) {
+        bool append_status = ctx->send_buffer.append(data, len);
+        if (!append_status || ctx->send_buffer.readableBytes() > HIGH_WATER_MARK) {
+            std::cerr << ctx->client_fd << ":慢客户端,踢掉\n";
+            close_client(epoll_fd, ctx);
+            return;
+        }
+        update_epollout(epoll_fd, ctx);
+        return;
+    }
     ssize_t sent = write(ctx->client_fd, data, len);
     if (sent >= 0 && static_cast<size_t>(sent) == len) {
         //数据都发完了，万事大吉！！！
         update_epollout(epoll_fd, ctx);
     }
     else if (sent >= 0 && static_cast<size_t>(sent) < len) {
-        //没发完
-        ctx->send_buffer.append(data + sent, len - sent);
-        if (ctx->send_buffer.readableBytes() > HIGH_WATER_MARK) {
+        //没发完,先查看有没有成功把剩余数据添加到缓冲区,然后在判断是不是慢客户端
+        bool append_status = ctx->send_buffer.append(data + sent, len - sent);
+        if (!append_status) {
             std::cerr << ctx->client_fd << ":这个客户端是一个慢客户端，先踢掉了\n";
             close_client(epoll_fd, ctx);
             return;
         }
-        update_epollout(epoll_fd, ctx);
+        else {
+            if (ctx->send_buffer.readableBytes() > HIGH_WATER_MARK) {
+                std::cerr << ctx->client_fd << ":这个客户端是一个慢客户端，先踢掉了\n";
+                close_client(epoll_fd, ctx);
+                return;
+            }
+            else {
+                update_epollout(epoll_fd, ctx);
+            }
+        }
     }
     else {
         if (errno == EAGAIN) {
-            //内核缓冲区满了
-            ctx->send_buffer.append(data, len);
-            if (ctx->send_buffer.readableBytes() > HIGH_WATER_MARK) {
-            std::cerr << ctx->client_fd << ":\n这个客户端是一个慢客户端，先踢掉了\n";
-            close_client(epoll_fd, ctx);
-            return;
-        }
-            update_epollout(epoll_fd, ctx);
+            //内核缓冲区满了,先把数据放到缓冲区,如果触发水位线,就踢掉,否则就更新epollout监听
+            bool append_status = ctx->send_buffer.append(data, len);
+            if (!append_status) {
+                std::cerr << ctx->client_fd << ":这个客户端是一个慢客户端，先踢掉了\n";
+                close_client(epoll_fd, ctx);
+                return;
+            }
+            else {
+                if (ctx->send_buffer.readableBytes() > HIGH_WATER_MARK) {
+                    std::cerr << ctx->client_fd << ":\n这个客户端是一个慢客户端，先踢掉了\n";
+                    close_client(epoll_fd, ctx);
+                    return;
+                }
+                else {
+                    update_epollout(epoll_fd, ctx);
+                }
+            }
+
+
         }
         else {
             //连接异常，发送失败
@@ -209,8 +239,6 @@ int main() {
     struct epoll_event events[MAX_EVENTS];
     std::cout << "开始监听端口：" << PORT << "传来的消息......\n";
 
-    std::vector<char> full_packet;
-    full_packet.reserve(8192); // 预留空间
 
     //进入事件主循环
     while (true) {
@@ -279,7 +307,6 @@ int main() {
                     if (bytes_read > 0) {
                         RingBuffer& rb = clients[client_fd].recv_buffer;
                         clients[client_fd].last_active_time = time(nullptr);
-                        timer_heap.push({time(nullptr) + 30, client_fd});
                         rb.append(buffer, bytes_read);
                         while (true) {
                             //状态A:解析包头
@@ -292,8 +319,7 @@ int main() {
                             MsgHeader header;
                             rb.peek(reinterpret_cast<char*>(&header), sizeof(MsgHeader));
                             //先判断是不是正确的包,魔法数对不上就丢弃
-                            if (ntohs(header.magic) != MAGIC_NUMBER) {
-                                std::cerr << "文件描述符:" << client_fd << "收到非魔法数,可能是一个垃圾包,断开连接\n";
+                            if (!isValidHeader(header)) {
                                 close_client(epoll_fd, &(clients[client_fd]));
                                 connection_closed = true;
                                 break;
@@ -310,6 +336,8 @@ int main() {
 
                             //状态C:提取完整包并滑动窗口
 
+                            std::vector<char> full_packet;
+                            full_packet.reserve(8192); // 预留空间
                             full_packet.resize(total_packet_size);
                             rb.peek(full_packet.data(), total_packet_size);
                             rb.retrieve(total_packet_size);

@@ -20,7 +20,7 @@ public:
     size_t writeableBytes() const;
 
     //把epoll recv到的网络数据放进环形缓冲区
-    void append(const char* data, size_t len) ;
+    bool append(const char* data, size_t len) ;
 
     //检查用于检查包头,不移动read_idx
     void peek(char* dest, size_t len) const;
