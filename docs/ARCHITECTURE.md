@@ -340,7 +340,7 @@ int main() {
 
 ### 当前进度
 - [x] Connection.h 设计完成
-- [ ] Connection.cpp
+- [x] Connection.cpp 完成
 - [ ] Server.h / Server.cpp
 - [ ] EventLoop.h / EventLoop.cpp
 - [ ] main.cpp 瘦身
