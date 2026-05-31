@@ -18,8 +18,8 @@ private:
     int port_;
     int epoll_fd_;
     int server_fd_;
-    std::unordered_map<int, unique_ptr<Connection>> connections_;
+    std::unordered_map<int, std::unique_ptr<Connection>> connections_;
     std::unordered_map<uint16_t, int> device_id_to_fd_;
-    std::unordered_map<int, vector<int>> subscribers_;
-    std::unordered_map<int, vector<int>> subscribed_to_;
+    std::unordered_map<int, std::vector<int>> subscribers_;
+    std::unordered_map<int, std::vector<int>> subscribed_to_;
 };
