@@ -53,14 +53,29 @@ void Server::start() {
         std::cerr << "监听失败";
         return;
     }
+
+    //注册server_fd的handler
+    loop_->setHandler(server_fd_, [this](uint32_t events) {
+        acceptNewConnection();
+    });
+    //注册超时回调
+    loop_->setTimeoutCallback([this](int fd) {
+        // 第一步：fd 还在不在
+        if (connections_.find(fd) == connections_.end()) return;
+        
+        // 第二步：心跳有没有刷新
+        time_t now = time(nullptr);
+        if (connections_[fd]->last_active_time_ + 30 > now) return;
+        
+        // 走到这里说明真的超时了，踢掉
+        onClose(connections_[fd].get());
+    });
+
     //设置监听套接字为非阻塞监听
     setNonBlocking(server_fd_);
 
     //将监听套接字添加到epoll实例中
-    struct epoll_event event{};
-    event.events = EPOLLIN | EPOLLET;//监听读事件和边缘触发式监听
-    event.data.fd = server_fd_;//监听指定文件描述符下的事件
-    epoll_ctl(epoll_fd_, EPOLL_CTL_ADD, server_fd_, &event);//往该epoll实例管理的监听红黑树中添加一个监听事件
+    loop_->addFd(server_fd_, EPOLLIN | EPOLLET);
 
 }
 
@@ -81,7 +96,7 @@ void Server::acceptNewConnection() {
         }
         //给客户端分配文件描述符成功
         std::cout << "有新的客户端连进来了！！！新成员的文件描述符是：" << client_fd << "\n";
-        connections_[client_fd] = std::make_unique<Connection>(client_fd, epoll_fd_);//怎么创建一个独占指着对象来着?
+        connections_[client_fd] = std::make_unique<Connection>(client_fd, loop_);//怎么创建一个独占指着对象来着?
 
 
         //将新的设备挂在到epoll_fd的监听红黑树上面，并设置监听模式为非阻塞式监听
@@ -92,11 +107,8 @@ void Server::acceptNewConnection() {
         connections_[client_fd]->on_close_ = [this](Connection* conn) {
             onClose(conn);
         };
-        // timer_heap.push({time(nullptr) + 30, client_fd});//这个应该是后面Eventloop负责的吧?
-        struct epoll_event client_event{};
-        client_event.events = EPOLLIN | EPOLLET;
-        client_event.data.fd = client_fd;
-        epoll_ctl(epoll_fd_, EPOLL_CTL_ADD, client_fd, &client_event);
+        loop_->pushTimer(client_fd, 30);
+        loop_->addFd(client_fd, EPOLLIN | EPOLLET);
         
         // std::cout << "卡死在265行了";
     }
@@ -131,7 +143,10 @@ void Server::onClose(Connection* conn) {
         subscribed_to_.erase(conn->fd_);
     }
     //从连接列表中抹除掉
+    loop_->removeHandler(conn->fd_);
     connections_.erase(conn->fd_);
+    
+
 
 }
 

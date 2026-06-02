@@ -3,12 +3,13 @@
 #include <unordered_map>
 #include <vector> 
 #include <memory> //智能指针
+#include "EventLoop.h"
 
 class Connection;
 
 class Server {
 public:
-    Server(int port, int epoll_fd);
+    Server(int port, EventLoop* loop);
     ~Server();
     void start();
     void acceptNewConnection();
@@ -16,7 +17,7 @@ public:
     void onClose(Connection*);
 private:
     int port_;
-    int epoll_fd_;
+    EventLoop* loop_;
     int server_fd_;
     std::unordered_map<int, std::unique_ptr<Connection>> connections_;
     std::unordered_map<uint16_t, int> device_id_to_fd_;

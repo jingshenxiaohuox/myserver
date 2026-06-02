@@ -8,7 +8,7 @@ class Connection {
 public:
     enum class Role {Unknow, Collector, Monitor};
 
-    Connection(int fd, int epoll_fd);
+    Connection(int fd, EventLoop* loop);
     ~Connection();
 
     void handleRead();
@@ -19,7 +19,7 @@ public:
     std::function<void(Connection*)> on_close_;
 
     int fd_;
-    int epoll_fd_;
+    EventLoop* loop_;
     Role role_ = Role::Unknow;
     uint16_t device_id_ = 0;
     time_t last_active_time_;

@@ -350,8 +350,8 @@ int main() {
 - [x] Connection.cpp 完成
 - [x] Server.h 
 - [x] Server.cpp
-- [ ] EventLoop.h / EventLoop.cpp
-- [ ] main.cpp 瘦身
+- [x] EventLoop.h / EventLoop.cpp
+- [x] main.cpp 瘦身
 
 ## Phase 1 预规划（Modbus TCP / MQTT）
 

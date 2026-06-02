@@ -23,7 +23,7 @@ Connection::Connection(int fd, int epoll_fd)
 
 Connection::~Connection() {
     //把fd从epoll监听树上面摘掉
-    epoll_ctl(epoll_fd_, EPOLL_CTL_DEL,  fd_, nullptr);
+    loop_->delFd(fd_);
     //关闭fd
     close(fd_);
    
@@ -38,7 +38,7 @@ void Connection::updateEpollout() {
         event.events = EPOLLIN | EPOLLET | EPOLLOUT;
     }
     event.data.fd = fd_;
-    epoll_ctl(epoll_fd_, EPOLL_CTL_MOD, fd_, &event);
+    loop_->modFd(fd_, event.events);
 }
 
 void Connection::send(const char* data, size_t len) {
