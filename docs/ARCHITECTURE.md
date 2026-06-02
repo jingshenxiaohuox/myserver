@@ -290,10 +290,17 @@ myserver/
 ├── CMakeLists.txt
 ├── include/
 │   ├── protocol.h          # TLV 协议定义
+│   ├── server.h          # server 定义
+│   ├── connection.h          # connection 协议定义
+│   ├── utils.h          # setnonblocking定义
+│   ├── Eventloop.h          # 待完成
 │   └── ringbuffer.h        # 环形缓冲区接口
 ├── src/
 │   ├── main.cpp            # Reactor 主循环 + 所有业务逻辑（待拆分）
 │   ├── protocol.cpp        # isValidHeader（当前未被 main 使用）
+│   ├── server.cpp        # server实现（当前未被 main 使用）
+│   ├── connection.cpp        # Connection实现（当前未被 main 使用）
+│   ├── Eventloop.cpp          # 待完成
 │   └── ringbuffer.cpp      # 环形缓冲区实现
 └── test/
     ├── test.py             # Python 功能+吞吐测试
@@ -332,7 +339,7 @@ TLV 状态机                → Connection::handleRead()
 ```cpp
 int main() {
     EventLoop loop;
-    Server server(8081, &loop);
+    Server server(8081, &loop);//⚠️ Server 构造函数签名待改：(int port, int epoll_fd) → (int port, EventLoop*)
     server.start();
     loop.run();
 }
