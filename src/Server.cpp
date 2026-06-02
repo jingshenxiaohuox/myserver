@@ -1,6 +1,17 @@
 #include "Server.h"
 #include <cstdint>
 #include "utils.h"
+#include <csignal>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <sys/epoll.h>
+#include <iostream>
+#include <cstring>
+#include <cerrno>
+#include <algorithm>
+#include <arpa/inet.h>
+#include "Connection.h"
+#include <protocol.h>
 
 Server::Server(int port, int epoll_fd)
     : port_(port)
@@ -77,10 +88,10 @@ void Server::acceptNewConnection() {
         setNonBlocking(client_fd);
         connections_[client_fd]->on_message_ = [this](Connection* conn, const char* data, size_t len) {
             onMessage(conn, data, len);
-        }
+        };
         connections_[client_fd]->on_close_ = [this](Connection* conn) {
             onClose(conn);
-        }
+        };
         // timer_heap.push({time(nullptr) + 30, client_fd});//这个应该是后面Eventloop负责的吧?
         struct epoll_event client_event{};
         client_event.events = EPOLLIN | EPOLLET;
@@ -92,10 +103,64 @@ void Server::acceptNewConnection() {
 }
 
 void Server::onClose(Connection* conn) {
-    //关闭文件描述符
-    //从连接列表中抹除掉
-    //从映射表中抹除掉
+    //从映射表中抹除掉(只有当客户端是采集端的时候才需要从映射表中抹除)
+    if (conn->role_ == Connection::Role::Collector) {
+        //当前的客户端是采集端
+        device_id_to_fd_.erase(conn->device_id_);
+    }
     //从订阅者中抹除掉
+    if (conn->role_ == Connection::Role::Collector) {
+        //当前客户端是采集端
+        //拿到自己的转发列表,知道都有谁订阅了自己
+        for (auto i : subscribers_[conn->fd_]) {
+            //把自己从订阅端的订阅列表中的移除
+            std::vector<int>& vec = subscribed_to_[i];
+            vec.erase(std::remove(vec.begin(), vec.end(), conn->fd_), vec.end());
+        }
+        subscribers_.erase(conn->fd_);
+    }
     //从向谁订阅列表中抹除掉
+    if (conn->role_ == Connection::Role::Monitor) {
+        //当前客户端是订阅端
+        //拿到自己的订阅列表,知道自己都订阅了谁
+        for (auto i : subscribed_to_[conn->fd_]) {
+            //把自己从采集端的转发列表中的移除
+            std::vector<int>& vec = subscribers_[i];
+            vec.erase(std::remove(vec.begin(), vec.end(), conn->fd_), vec.end());
+        }
+        subscribed_to_.erase(conn->fd_);
+    }
+    //从连接列表中抹除掉
+    connections_.erase(conn->fd_);
 
+}
+
+void Server::onMessage(Connection* conn, const char* data, size_t len) {
+    MsgHeader header;
+    memcpy(&header, data, sizeof(MsgHeader));
+    if (ntohs(header.type) == static_cast<uint16_t>(MsgType::HeartBeat)) {
+        conn->send(reinterpret_cast<char*>(&header),sizeof(header));
+    }
+    else if (ntohs(header.type) == static_cast<uint16_t>(MsgType::RegisterCollector)) {
+        conn->role_ = Connection::Role::Collector;
+        conn->device_id_ = ntohs(header.id);
+        std::cout << "id: " << conn->device_id_ << "成功注册为采集端\n";
+        device_id_to_fd_.emplace(conn->device_id_, conn->fd_);
+    }
+    else if (ntohs(header.type) == static_cast<uint16_t>(MsgType::RegisterMonitor)) {
+        conn->role_ = Connection::Role::Monitor;
+        conn->device_id_ = ntohs(header.id);
+        std::cout << "id: " << conn->device_id_ << "成功注册为监控端\n";
+        if (device_id_to_fd_.find(conn->device_id_) == device_id_to_fd_.end()) {
+            std::cout << "试图订阅的采集端不存在!!!\n";//这个信息其实应该发给订阅端,不知道怎么直接发送一串字符串
+            return;
+        }
+        subscribed_to_[conn->fd_].push_back(device_id_to_fd_[conn->device_id_]);
+        subscribers_[device_id_to_fd_[conn->device_id_]].push_back(conn->fd_);
+    }
+    else if (ntohs(header.type) == static_cast<uint16_t>(MsgType::VideoFrame)) {
+        for (int sub_fd : subscribers_[conn->fd_]) {
+            connections_[sub_fd]->send(data, len);
+        }
+    }
 }
