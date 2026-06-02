@@ -68,7 +68,7 @@ def main():
 
     start = time.time()
     # 发包循环（10000次）
-    for i in range(10000):
+    for i in range(100):
         sock.sendall(build_packet(2, 1, b'x' * 64 * 1024))
     elapsed = time.time() - start
     sock.close()

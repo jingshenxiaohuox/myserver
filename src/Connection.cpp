@@ -8,13 +8,14 @@
 #include <arpa/inet.h>     // ntohl, ntohs
 #include <iostream>        // cerr, cout
 #include <vector>          // vector
+#include "EventLoop.h"
 
 
 static constexpr size_t HIGH_WATER_MARK = 1 * 1024 * 1024;
 
-Connection::Connection(int fd, int epoll_fd)
+Connection::Connection(int fd, EventLoop* loop)
     : fd_(fd)
-    , epoll_fd_(epoll_fd)
+    , loop_(loop)
     , last_active_time_(time(nullptr))
     , recv_buffer_(128 * 1024)
     , send_buffer_(4 * 1024 * 1024) {

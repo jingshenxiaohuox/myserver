@@ -8,6 +8,9 @@ set(CMAKE_DEPENDS_LANGUAGES
 
 # The set of dependency files which are needed:
 set(CMAKE_DEPENDS_DEPENDENCY_FILES
+  "/home/ljq/myserver/src/Connection.cpp" "CMakeFiles/gateway_server.dir/src/Connection.cpp.o" "gcc" "CMakeFiles/gateway_server.dir/src/Connection.cpp.o.d"
+  "/home/ljq/myserver/src/Eventloop.cpp" "CMakeFiles/gateway_server.dir/src/Eventloop.cpp.o" "gcc" "CMakeFiles/gateway_server.dir/src/Eventloop.cpp.o.d"
+  "/home/ljq/myserver/src/Server.cpp" "CMakeFiles/gateway_server.dir/src/Server.cpp.o" "gcc" "CMakeFiles/gateway_server.dir/src/Server.cpp.o.d"
   "/home/ljq/myserver/src/main.cpp" "CMakeFiles/gateway_server.dir/src/main.cpp.o" "gcc" "CMakeFiles/gateway_server.dir/src/main.cpp.o.d"
   "/home/ljq/myserver/src/protocol.cpp" "CMakeFiles/gateway_server.dir/src/protocol.cpp.o" "gcc" "CMakeFiles/gateway_server.dir/src/protocol.cpp.o.d"
   "/home/ljq/myserver/src/ringbuffer.cpp" "CMakeFiles/gateway_server.dir/src/ringbuffer.cpp.o" "gcc" "CMakeFiles/gateway_server.dir/src/ringbuffer.cpp.o.d"

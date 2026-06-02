@@ -1,4 +1,10 @@
 file(REMOVE_RECURSE
+  "CMakeFiles/gateway_server.dir/src/Connection.cpp.o"
+  "CMakeFiles/gateway_server.dir/src/Connection.cpp.o.d"
+  "CMakeFiles/gateway_server.dir/src/Eventloop.cpp.o"
+  "CMakeFiles/gateway_server.dir/src/Eventloop.cpp.o.d"
+  "CMakeFiles/gateway_server.dir/src/Server.cpp.o"
+  "CMakeFiles/gateway_server.dir/src/Server.cpp.o.d"
   "CMakeFiles/gateway_server.dir/src/main.cpp.o"
   "CMakeFiles/gateway_server.dir/src/main.cpp.o.d"
   "CMakeFiles/gateway_server.dir/src/protocol.cpp.o"

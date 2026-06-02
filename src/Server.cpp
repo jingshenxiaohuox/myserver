@@ -13,11 +13,14 @@
 #include "Connection.h"
 #include <protocol.h>
 
-Server::Server(int port, int epoll_fd)
+Server::Server(int port, EventLoop* loop)
     : port_(port)
-    , epoll_fd_(epoll_fd)
+    , loop_(loop)
     , server_fd_(-1) {
 
+}
+
+Server::~Server() {
 }
 
 void Server::start() {
@@ -55,7 +58,7 @@ void Server::start() {
     }
 
     //注册server_fd的handler
-    loop_->setHandler(server_fd_, [this](uint32_t events) {
+    loop_->setHandler(server_fd_, [this](uint32_t) {
         acceptNewConnection();
     });
     //注册超时回调
@@ -108,6 +111,11 @@ void Server::acceptNewConnection() {
             onClose(conn);
         };
         loop_->pushTimer(client_fd, 30);
+        Connection* conn_ptr = connections_[client_fd].get();
+        loop_->setHandler(client_fd, [conn_ptr](uint32_t events) {
+            if (events & EPOLLIN)  conn_ptr->handleRead();
+            if (events & EPOLLOUT) conn_ptr->handleWrite();
+        });
         loop_->addFd(client_fd, EPOLLIN | EPOLLET);
         
         // std::cout << "卡死在265行了";

@@ -258,7 +258,7 @@ const size_t HIGH_WATER_MARK = 6144; // ⚠️ 见已知问题
 | # | 问题 | 位置 | 风险 |
 |---|------|------|------|
 | 4 | ~~`isValidHeader()` 在 protocol.cpp 定义但 main.cpp 中未使用~~ | ~~protocol.cpp~~ | ✅️代码冗余，逻辑分散（main.cpp 自己做 magic 校验）|
-| 5 | main.cpp 约 400 行，所有逻辑混在一个文件 | main.cpp | 模块边界不清，Phase 1 接入新协议时难以维护 |
+| 5 | ~~main.cpp 约 400 行，所有逻辑混在一个文件~~ | ~~main.cpp~~ | ✅️已完成重构,模块边界不清，Phase 1 接入新协议时难以维护 |
 | 6 | ~~`send_data` 和 `handle_write` 存在逻辑重叠~~ | ~~main.cpp:94/129~~ | ✅️部分发送路径不一致，存在 send_buffer 双重操作风险 |
 | 7 | 日志全用 `std::cerr/cout`，无级别无时间戳 | 全局 | 生产环境无法使用，定位问题困难 |
 

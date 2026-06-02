@@ -6,5 +6,5 @@ CXX_DEFINES =
 
 CXX_INCLUDES = -I/home/ljq/myserver/include
 
-CXX_FLAGS =  -Wall -Wextra -g -O0 -std=gnu++11
+CXX_FLAGS =  -Wall -Wextra -g -O0 -std=gnu++14
 

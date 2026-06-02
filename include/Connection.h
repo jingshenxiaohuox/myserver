@@ -2,8 +2,9 @@
 #include <functional>
 #include <ctime>
 #include "ringbuffer.h"
+#include <cstdint>
 
-
+class EventLoop;
 class Connection {
 public:
     enum class Role {Unknow, Collector, Monitor};

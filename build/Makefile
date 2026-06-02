@@ -142,6 +142,78 @@ bench_client/fast:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/bench_client.dir/build.make CMakeFiles/bench_client.dir/build
 .PHONY : bench_client/fast
 
+src/Connection.o: src/Connection.cpp.o
+.PHONY : src/Connection.o
+
+# target to build an object file
+src/Connection.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/gateway_server.dir/build.make CMakeFiles/gateway_server.dir/src/Connection.cpp.o
+.PHONY : src/Connection.cpp.o
+
+src/Connection.i: src/Connection.cpp.i
+.PHONY : src/Connection.i
+
+# target to preprocess a source file
+src/Connection.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/gateway_server.dir/build.make CMakeFiles/gateway_server.dir/src/Connection.cpp.i
+.PHONY : src/Connection.cpp.i
+
+src/Connection.s: src/Connection.cpp.s
+.PHONY : src/Connection.s
+
+# target to generate assembly for a file
+src/Connection.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/gateway_server.dir/build.make CMakeFiles/gateway_server.dir/src/Connection.cpp.s
+.PHONY : src/Connection.cpp.s
+
+src/Eventloop.o: src/Eventloop.cpp.o
+.PHONY : src/Eventloop.o
+
+# target to build an object file
+src/Eventloop.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/gateway_server.dir/build.make CMakeFiles/gateway_server.dir/src/Eventloop.cpp.o
+.PHONY : src/Eventloop.cpp.o
+
+src/Eventloop.i: src/Eventloop.cpp.i
+.PHONY : src/Eventloop.i
+
+# target to preprocess a source file
+src/Eventloop.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/gateway_server.dir/build.make CMakeFiles/gateway_server.dir/src/Eventloop.cpp.i
+.PHONY : src/Eventloop.cpp.i
+
+src/Eventloop.s: src/Eventloop.cpp.s
+.PHONY : src/Eventloop.s
+
+# target to generate assembly for a file
+src/Eventloop.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/gateway_server.dir/build.make CMakeFiles/gateway_server.dir/src/Eventloop.cpp.s
+.PHONY : src/Eventloop.cpp.s
+
+src/Server.o: src/Server.cpp.o
+.PHONY : src/Server.o
+
+# target to build an object file
+src/Server.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/gateway_server.dir/build.make CMakeFiles/gateway_server.dir/src/Server.cpp.o
+.PHONY : src/Server.cpp.o
+
+src/Server.i: src/Server.cpp.i
+.PHONY : src/Server.i
+
+# target to preprocess a source file
+src/Server.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/gateway_server.dir/build.make CMakeFiles/gateway_server.dir/src/Server.cpp.i
+.PHONY : src/Server.cpp.i
+
+src/Server.s: src/Server.cpp.s
+.PHONY : src/Server.s
+
+# target to generate assembly for a file
+src/Server.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/gateway_server.dir/build.make CMakeFiles/gateway_server.dir/src/Server.cpp.s
+.PHONY : src/Server.cpp.s
+
 src/main.o: src/main.cpp.o
 .PHONY : src/main.o
 
@@ -254,6 +326,15 @@ help:
 	@echo "... rebuild_cache"
 	@echo "... bench_client"
 	@echo "... gateway_server"
+	@echo "... src/Connection.o"
+	@echo "... src/Connection.i"
+	@echo "... src/Connection.s"
+	@echo "... src/Eventloop.o"
+	@echo "... src/Eventloop.i"
+	@echo "... src/Eventloop.s"
+	@echo "... src/Server.o"
+	@echo "... src/Server.i"
+	@echo "... src/Server.s"
 	@echo "... src/main.o"
 	@echo "... src/main.i"
 	@echo "... src/main.s"

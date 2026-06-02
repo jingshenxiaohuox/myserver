@@ -111,11 +111,56 @@ CMakeFiles/gateway_server.dir/src/protocol.cpp.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/gateway_server.dir/src/protocol.cpp.s"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/ljq/myserver/src/protocol.cpp -o CMakeFiles/gateway_server.dir/src/protocol.cpp.s
 
+CMakeFiles/gateway_server.dir/src/Connection.cpp.o: CMakeFiles/gateway_server.dir/flags.make
+CMakeFiles/gateway_server.dir/src/Connection.cpp.o: ../src/Connection.cpp
+CMakeFiles/gateway_server.dir/src/Connection.cpp.o: CMakeFiles/gateway_server.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/ljq/myserver/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_4) "Building CXX object CMakeFiles/gateway_server.dir/src/Connection.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/gateway_server.dir/src/Connection.cpp.o -MF CMakeFiles/gateway_server.dir/src/Connection.cpp.o.d -o CMakeFiles/gateway_server.dir/src/Connection.cpp.o -c /home/ljq/myserver/src/Connection.cpp
+
+CMakeFiles/gateway_server.dir/src/Connection.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing CXX source to CMakeFiles/gateway_server.dir/src/Connection.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/ljq/myserver/src/Connection.cpp > CMakeFiles/gateway_server.dir/src/Connection.cpp.i
+
+CMakeFiles/gateway_server.dir/src/Connection.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/gateway_server.dir/src/Connection.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/ljq/myserver/src/Connection.cpp -o CMakeFiles/gateway_server.dir/src/Connection.cpp.s
+
+CMakeFiles/gateway_server.dir/src/Server.cpp.o: CMakeFiles/gateway_server.dir/flags.make
+CMakeFiles/gateway_server.dir/src/Server.cpp.o: ../src/Server.cpp
+CMakeFiles/gateway_server.dir/src/Server.cpp.o: CMakeFiles/gateway_server.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/ljq/myserver/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_5) "Building CXX object CMakeFiles/gateway_server.dir/src/Server.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/gateway_server.dir/src/Server.cpp.o -MF CMakeFiles/gateway_server.dir/src/Server.cpp.o.d -o CMakeFiles/gateway_server.dir/src/Server.cpp.o -c /home/ljq/myserver/src/Server.cpp
+
+CMakeFiles/gateway_server.dir/src/Server.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing CXX source to CMakeFiles/gateway_server.dir/src/Server.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/ljq/myserver/src/Server.cpp > CMakeFiles/gateway_server.dir/src/Server.cpp.i
+
+CMakeFiles/gateway_server.dir/src/Server.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/gateway_server.dir/src/Server.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/ljq/myserver/src/Server.cpp -o CMakeFiles/gateway_server.dir/src/Server.cpp.s
+
+CMakeFiles/gateway_server.dir/src/Eventloop.cpp.o: CMakeFiles/gateway_server.dir/flags.make
+CMakeFiles/gateway_server.dir/src/Eventloop.cpp.o: ../src/Eventloop.cpp
+CMakeFiles/gateway_server.dir/src/Eventloop.cpp.o: CMakeFiles/gateway_server.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/ljq/myserver/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_6) "Building CXX object CMakeFiles/gateway_server.dir/src/Eventloop.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/gateway_server.dir/src/Eventloop.cpp.o -MF CMakeFiles/gateway_server.dir/src/Eventloop.cpp.o.d -o CMakeFiles/gateway_server.dir/src/Eventloop.cpp.o -c /home/ljq/myserver/src/Eventloop.cpp
+
+CMakeFiles/gateway_server.dir/src/Eventloop.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing CXX source to CMakeFiles/gateway_server.dir/src/Eventloop.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/ljq/myserver/src/Eventloop.cpp > CMakeFiles/gateway_server.dir/src/Eventloop.cpp.i
+
+CMakeFiles/gateway_server.dir/src/Eventloop.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/gateway_server.dir/src/Eventloop.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/ljq/myserver/src/Eventloop.cpp -o CMakeFiles/gateway_server.dir/src/Eventloop.cpp.s
+
 # Object files for target gateway_server
 gateway_server_OBJECTS = \
 "CMakeFiles/gateway_server.dir/src/main.cpp.o" \
 "CMakeFiles/gateway_server.dir/src/ringbuffer.cpp.o" \
-"CMakeFiles/gateway_server.dir/src/protocol.cpp.o"
+"CMakeFiles/gateway_server.dir/src/protocol.cpp.o" \
+"CMakeFiles/gateway_server.dir/src/Connection.cpp.o" \
+"CMakeFiles/gateway_server.dir/src/Server.cpp.o" \
+"CMakeFiles/gateway_server.dir/src/Eventloop.cpp.o"
 
 # External object files for target gateway_server
 gateway_server_EXTERNAL_OBJECTS =
@@ -123,9 +168,12 @@ gateway_server_EXTERNAL_OBJECTS =
 gateway_server: CMakeFiles/gateway_server.dir/src/main.cpp.o
 gateway_server: CMakeFiles/gateway_server.dir/src/ringbuffer.cpp.o
 gateway_server: CMakeFiles/gateway_server.dir/src/protocol.cpp.o
+gateway_server: CMakeFiles/gateway_server.dir/src/Connection.cpp.o
+gateway_server: CMakeFiles/gateway_server.dir/src/Server.cpp.o
+gateway_server: CMakeFiles/gateway_server.dir/src/Eventloop.cpp.o
 gateway_server: CMakeFiles/gateway_server.dir/build.make
 gateway_server: CMakeFiles/gateway_server.dir/link.txt
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --bold --progress-dir=/home/ljq/myserver/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_4) "Linking CXX executable gateway_server"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --bold --progress-dir=/home/ljq/myserver/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_7) "Linking CXX executable gateway_server"
 	$(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/gateway_server.dir/link.txt --verbose=$(VERBOSE)
 
 # Rule to build all files generated by this target.

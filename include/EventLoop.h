@@ -43,7 +43,7 @@ private:
         bool operator>(const TimerEntry& o) const { return expire > o.expire; }
     };
     std::priority_queue
-        TimerEntry,
+        <TimerEntry,
         std::vector<TimerEntry>,
         std::greater<TimerEntry>> timer_heap_;
 

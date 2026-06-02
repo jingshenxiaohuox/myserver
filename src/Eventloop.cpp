@@ -1,4 +1,6 @@
-#include <Eventloop.h>
+#include <EventLoop.h>
+#include <unistd.h>   // close
+#include <sys/epoll.h> // epoll_create1, epoll_ctl, epoll_wait
 
 EventLoop::EventLoop() {
     epoll_fd_ = epoll_create1(0);
@@ -63,7 +65,7 @@ void EventLoop::run() {
         
 }
 
-void Eventloop::checkTimers() {
+void EventLoop::checkTimers() {
     time_t now = time(nullptr);
     while (!timer_heap_.empty()) {
         TimerEntry time_top = timer_heap_.top();
