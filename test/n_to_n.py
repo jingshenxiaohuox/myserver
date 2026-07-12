@@ -1,173 +1,139 @@
-import struct
-import socket
-import time
-import threading
 import argparse
+import socket
+import struct
+import threading
+import time
 
 HEADER_FORMAT = '!HBHIHH'
 HEADER_SIZE = struct.calcsize(HEADER_FORMAT)
 MAGIC = 520
+VIDEO_FRAME = 2
+MAX_PAYLOAD = 4 * 1024 * 1024
 
-def build_packet(msg_type, device_id, body=b''):
-    header = struct.pack(HEADER_FORMAT,
-        MAGIC,
-        1,
-        msg_type,
-        len(body),
-        device_id,
-        0
-    )
-    return header + body
 
-def collector_sender(sock, device_id, m, result):
-    start = time.time()
-    for i in range(m):
-        sock.sendall(build_packet(2, device_id, b'x' * 64 * 1024))
-    elapsed = time.time() - start
+def packet(kind, device_id, body=b''):
+    return struct.pack(HEADER_FORMAT, MAGIC, 1, kind, len(body), device_id, 0) + body
 
-    result[device_id] = {
-        'elapsed': elapsed
-    }
 
-def monitor_receiver(monitor_id, sock, total_frames, result):
-    """每个 Monitor 独立接收线程"""
-    total_bytes = 0
-    frames_received = 0
-    start_time = None
-
-    expected_frame_size = HEADER_SIZE + 64 * 1024
-    recv_buf = b''
-
-    while True:
+def receive(monitor_id, sock, device_id, target, started, deadline, results):
+    frames = 0
+    payload_bytes = 0
+    invalid = 0
+    buffer = bytearray()
+    started.wait()
+    sock.settimeout(0.2)
+    while time.perf_counter() < deadline['value']:
         try:
             data = sock.recv(256 * 1024)
-        except Exception:
+        except socket.timeout:
+            continue
+        except OSError:
             break
         if not data:
             break
+        buffer.extend(data)
+        while len(buffer) >= HEADER_SIZE:
+            magic, version, kind, length, frame_id, _ = struct.unpack(
+                HEADER_FORMAT, buffer[:HEADER_SIZE]
+            )
+            size = HEADER_SIZE + length
+            if magic != MAGIC or version != 1 or length > MAX_PAYLOAD:
+                invalid += 1
+                results[monitor_id] = (frames, payload_bytes, invalid, None)
+                return
+            if len(buffer) < size:
+                break
+            del buffer[:size]
+            if kind == VIDEO_FRAME and frame_id == device_id:
+                frames += 1
+                payload_bytes += size
+                if frames == target:
+                    results[monitor_id] = (frames, payload_bytes, invalid, time.perf_counter())
+                    return
+    results[monitor_id] = (frames, payload_bytes, invalid, None)
 
-        if start_time is None:
-            start_time = time.time()
 
-        recv_buf += data
+def send(collector, device_id, count, body, started):
+    started.wait()
+    for _ in range(count):
+        collector.sendall(packet(VIDEO_FRAME, device_id, body))
+    collector.close()
 
-        # 按帧边界统计，避免粘包导致帧数统计错误
-        while len(recv_buf) >= expected_frame_size:
-            recv_buf = recv_buf[expected_frame_size:]
-            frames_received += 1
-            total_bytes += expected_frame_size
-
-    end_time = time.time()
-
-    result[monitor_id] = {
-        'bytes':   total_bytes,
-        'frames':  frames_received,
-        'elapsed': end_time - start_time if start_time else 0,
-    }
 
 def main():
-    parser = argparse.ArgumentParser(description='N-to-N')
-    parser.add_argument('-n', type=int, default=2,   help='Collector和Monitor 数量（默认2）')
-    parser.add_argument('-m', type=int, default=2,   help='每个Collector发送的帧数（默认1000）')
-
+    parser = argparse.ArgumentParser(description='N 对 N 配对转发压测')
+    parser.add_argument('-n', type=int, default=2, help='Collector/Monitor 对数')
+    parser.add_argument('-m', type=int, default=1000, help='每个 Collector 发送帧数')
+    parser.add_argument('--timeout', type=float, default=30.0, help='整体超时秒数')
     args = parser.parse_args()
-    N = args.n
-    M = args.m
-    print(f"压测参数：{N} Collector → {N} Monitor，发送 {M} 帧（每帧 64KB）")
-    print(f"预计总发送量：{M * 64 / 1024:.1f} MB，预计总转发量：{M * N * 64 / 1024:.1f} MB\n")
+    body = b'x' * (64 * 1024)
+    frame_size = HEADER_SIZE + len(body)
+    print(f'压测参数：{args.n} 对 Collector/Monitor，每个 Collector {args.m} 帧')
 
-    collectors = []
-    for i in range(N):
+    collectors, monitors = [], []
+    for device_id in range(1, args.n + 1):
         collector = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         collector.connect(('127.0.0.1', 8081))
-        collector.sendall(build_packet(3, i + 1))
+        collector.sendall(packet(3, device_id))
         collectors.append(collector)
-        print(f"Collector 注册成功（device_id={i + 1}）")
-    time.sleep(0.1)
+    time.sleep(0.2)
+    for device_id in range(1, args.n + 1):
+        monitor = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        monitor.connect(('127.0.0.1', 8081))
+        monitor.sendall(packet(4, device_id))
+        monitors.append(monitor)
+    time.sleep(0.5)  # 仅等待注册完成，不参与计时。
 
-    monitors = []
-    for i in range(N):
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.connect(('127.0.0.1', 8081))
-        sock.sendall(build_packet(4, i + 1))
-        monitors.append(sock)
-        print(f"Monitor {i+1} 注册成功")
+    started = threading.Event()
+    deadline = {'value': float('inf')}
+    results, receiver_threads, sender_threads = {}, [], []
+    for device_id, monitor in enumerate(monitors, start=1):
+        thread = threading.Thread(target=receive, args=(device_id, monitor, device_id,
+                                  args.m, started, deadline, results), daemon=True)
+        thread.start()
+        receiver_threads.append(thread)
+    for device_id, collector in enumerate(collectors, start=1):
+        thread = threading.Thread(target=send, args=(collector, device_id, args.m, body, started), daemon=True)
+        thread.start()
+        sender_threads.append(thread)
 
-    results = {}
-    threads = []
-    for i, sock in enumerate(collectors):
-        t = threading.Thread(target=collector_sender, args=(sock, i + 1, M, results))
-        t.daemon = True
-        t.start()
-        threads.append(t)
-
-    results_m = {}
-    threads_m = []
-    for i, sock in enumerate(monitors):
-        t = threading.Thread(target=monitor_receiver, args=(i + 1, sock, M, results_m))
-        t.daemon = True
-        t.start()
-        threads_m.append(t)
-
-    for t in threads:
-        t.join()
-
-    for sock in collectors:
+    start = time.perf_counter()
+    deadline['value'] = start + args.timeout
+    started.set()
+    for thread in sender_threads:
+        thread.join()
+    for thread in receiver_threads:
+        thread.join(timeout=max(0, deadline['value'] - time.perf_counter()))
+    for monitor in monitors:
         try:
-            sock.shutdown(socket.SHUT_RDWR)
-            sock.close()
-        except Exception:
+            monitor.shutdown(socket.SHUT_RDWR)
+        except OSError:
             pass
+        monitor.close()
+    for thread in receiver_threads:
+        thread.join()
 
-    # ★ 关键：给在途数据一点时间到达 Monitor
-    time.sleep(5)
+    expected = args.n * args.m
+    received_frames = sum(item[0] for item in results.values())
+    received_bytes = sum(item[1] for item in results.values())
+    incomplete = []
+    for device_id in range(1, args.n + 1):
+        frames, _, invalid, finished = results.get(device_id, (0, 0, 0, None))
+        if frames != args.m or invalid:
+            incomplete.append(f'Monitor {device_id}: {frames}/{args.m} 帧，非法帧 {invalid}')
+    print('\n========== 压测结果 =========')
+    if received_frames == expected and not incomplete:
+        end = max(item[3] for item in results.values())
+        elapsed = end - start
+        print(f'全部收齐：{expected}/{expected} 帧')
+        print(f'聚合转发有效吞吐：{received_bytes / elapsed / 1024 / 1024:.2f} MiB/s')
+        print(f'总耗时：{elapsed:.3f}s（首帧发送至最后一个 Monitor 收齐）')
+    else:
+        print(f'本轮无效：收到 {received_frames}/{expected} 帧')
+        for line in incomplete:
+            print(line)
+    print('==============================')
 
-    # ★ 先关 Monitor socket，让 recv() 解除阻塞
-    for sock in monitors:
-        try:
-            sock.shutdown(socket.SHUT_RDWR)
-            sock.close()
-        except Exception:
-            pass
-
-    # 现在 Monitor 线程的 recv() 会返回 b''，线程自然退出
-    for t in threads_m:
-        t.join()
-
-
-    # 6. 汇总输出
-    print("\n========== 压测结果 ==========")
-    send_elapsed = max(results[i]['elapsed'] for i in results if results[i]['elapsed'] > 0)
-    send_throughput = (M * (HEADER_SIZE + 64 * 1024)) / send_elapsed / 1024 / 1024
-    print(f"发送吞吐量:   {send_throughput:.2f} MB/s")
-    print()
-
-    total_recv_bytes  = 0
-    total_recv_frames = 0
-    for i in range(1, N + 1):
-        r = results_m.get(i)
-        if not r or r['elapsed'] == 0:
-            print(f"Monitor {i}: 未收到数据")
-            continue
-        throughput = r['bytes'] / r['elapsed'] / 1024 / 1024
-        loss = M - r['frames']
-        loss_rate = loss / M * 100
-        total_recv_bytes  += r['bytes']
-        total_recv_frames += r['frames']
-        print(f"Monitor {i}:  收到 {r['frames']}/{M} 帧  "
-              f"丢帧 {loss}（{loss_rate:.1f}%）  "
-              f"吞吐量 {throughput:.2f} MB/s")
-
-    print()
-    if total_recv_frames > 0:
-        total_elapsed = max(results_m[i]['elapsed'] for i in results_m if results_m[i]['elapsed'] > 0)
-        total_throughput = total_recv_bytes / total_elapsed / 1024 / 1024
-        print(f"网关总转发吞吐量: {total_throughput:.2f} MB/s（{N} 个 Monitor 合计）")
-
-    print("================================")
-    
 
 if __name__ == '__main__':
     main()
-    
-
