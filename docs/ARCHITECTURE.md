@@ -98,7 +98,7 @@ enum class MsgType : uint16_t {
 };
 ```
 
-### ClientContext（连接级上下文）⚠️待替换为Connection类
+### ClientContext（连接级上下文）替换为Connection类
 
 ```cpp
 struct ClientContext {
@@ -116,7 +116,7 @@ struct ClientContext {
     std::vector<int> subscribed_to;
 };
 ```
-### Connection (ClientContext 重构后的替代,进行中)
+### Connection (ClientContext 重构后的替代)
 ```cpp
 #pragma once
 #include 
