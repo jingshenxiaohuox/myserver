@@ -67,12 +67,6 @@ Phase 4：边缘 AI 能力（ONNX Runtime / TensorRT）
 | 高水位线防护 | main.cpp | ✅ | 慢客户端超过 HIGH_WATER_MARK 踢出 |
 | 自定义协议 | protocol.h/cpp | ✅ | TLV + Magic + Version + MsgType |
 
-### 待完成（Phase 0 收尾）
-
-- [目前用不到] `bench_client.cpp`：基准测试客户端（当前为空壳）
-- [已完成] `1_to_n.py`：1 采集端对 N 监控端压测脚本
-- [ ] 无锁线程安全发送队列（为 Phase 2 多线程做准备）
-
 ---
 
 ## 核心数据结构
@@ -268,7 +262,7 @@ const size_t HIGH_WATER_MARK = 6144; // ⚠️ 见已知问题
 |---|------|------|
 | 8 | 协议字段 `organization` 未使用 | 预留字段，后续可做多租户隔离 |
 | 9 | `bench_client.cpp` 为空 | 缺乏 C++ 层压测能力 |
-| 10 | Monitor 订阅不存在的 Collector 时只打日志，未向客户端回包 | 客户端无感知 |
+| 10 | Monitor 注册/订阅无 ACK 或错误回包 | 客户端只能用固定等待猜测注册完成；压测应在收到 ACK 后再发压 |
 
 ---
 
@@ -278,8 +272,10 @@ const size_t HIGH_WATER_MARK = 6144; // ⚠️ 见已知问题
 |------|------|------|
 | test/test.py | 单采集端 + 单监控端功能验证 + 吞吐量测试 | ✅ 可用 |
 | test/bench_client.cpp | C++ 高并发压测客户端 | ❌ 空壳待实现(暂时不需要用到) | 
-| test/1_to_n.py | 1 采集端对 N 监控端扇出压测 | ❌ 空文件待实现 |✅️已实现
-| test/n_to_n.py | N采集端对N监控端全矩阵压测 | ✅ 可用（已发现上述 #11~#13）|
+| test/1_to_n.py | 1 Collector → N Monitor 扇出压测 | 已完成 TLV 完整帧统计与收齐计时 |
+| test/n_to_n.py | N 对 N 配对转发压测 | 已完成 TLV 完整帧统计与收齐计时 |
+| test/n_to_n_full_mesh.py | N×N 全矩阵订阅压测 | 已完成 TLV 完整帧统计与收齐计时 |
+| test/BENCHMARK.md | 压测口径与实验记录 | 可用 |
 
 ---
 
@@ -353,24 +349,26 @@ int main() {
 - [x] EventLoop.h / EventLoop.cpp
 - [x] main.cpp 瘦身
 
-## Phase 1 预规划（Modbus TCP / MQTT）
+## Phase 1 预规划（先做 Modbus TCP）
 
-进入 Phase 1 前，建议先完成以下重构：
+已完成的基础重构：
 
-1. **拆分 main.cpp** → Server 类 / EventLoop 类 / Connection 类
-2. **修复 HIGH_WATER_MARK**，调整为至少 4MB 以支持视频帧
-3. **RingBuffer::append 改为返回 bool**：让上层能感知写入失败
-4. **send_data 失败时正确触发 close_client**：使 HIGH_WATER_MARK 真正生效
-5. **拆分 main.cpp** → Server 类 / EventLoop 类 / Connection 类
-6. **修复 timer_heap 无限增长问题**
+- [x] `main.cpp` 已拆分为 `Server` / `Connection` / `EventLoop`。
+- [x] `send_buffer` 为 4 MiB，`RingBuffer::append` 返回 `bool`，发送失败会经 `on_close_` 清理连接。
 
-Phase 1 新增模块：
+进入 Phase 1 前仍需处理：
+
+1. 修正定时器刷新：当前不再在每次 `recv` 时重复入堆，但也没有重新安排下一次超时检查。
+2. 为注册/订阅增加成功与错误 ACK；压测客户端收到全部 ACK 后再开始计时。
+3. 补 Release 构建、CPU/RSS/延迟采样与结构化日志。
+
+Phase 1 最小闭环：
+
+```text
+Modbus TCP ADU 解析 → 统一内部消息 → 复用现有发布订阅分发
 ```
-src/
-├── protocol/
-│   ├── modbus_tcp.h/cpp    # Modbus TCP ADU 解析
-│   └── mqtt_codec.h/cpp    # MQTT 3.1.1 报文编解码
-```
+
+先实现 `modbus_tcp.h/cpp`；MQTT 编解码延后到 Modbus 闭环稳定后再加入。
 
 ---
 
