@@ -1,1 +1,0 @@
-/usr/bin/c++  -Wall -Wextra -g -O0 CMakeFiles/gateway_server.dir/src/main.cpp.o CMakeFiles/gateway_server.dir/src/ringbuffer.cpp.o CMakeFiles/gateway_server.dir/src/protocol.cpp.o CMakeFiles/gateway_server.dir/src/Connection.cpp.o CMakeFiles/gateway_server.dir/src/Server.cpp.o CMakeFiles/gateway_server.dir/src/Eventloop.cpp.o -o gateway_server 
