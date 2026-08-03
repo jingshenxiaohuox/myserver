@@ -224,9 +224,9 @@ t=50  堆中没有 TimerEntry，因此不会再检查
 
 ---
 
-## 七、任务 5：改为基于 device_id 的发布订阅
+## 七、任务 5：改为基于 device_id 的发布订阅（已完成）
 
-### 当前问题
+### 改造前问题
 
 当前主要关系是：
 
@@ -238,7 +238,7 @@ Monitor fd → Collector fd 列表
 
 真正转发 `VideoFrame` 时使用发送消息的 `conn->fd_`，没有校验消息 Header 中的设备 ID。Modbus 设备不会天然拥有一个 TCP Collector Connection，因此这种路由无法直接复用。
 
-### 目标数据结构
+### 已实现的数据结构
 
 ```cpp
 std::unordered_map<uint16_t, std::unordered_set<int>>
@@ -256,9 +256,9 @@ device_id → TCP Collector fd
 
 但它只负责来源注册和校验，不再决定发布订阅路由。
 
-### 统一发布接口
+### 已实现的统一发布接口
 
-计划新增类似接口：
+当前接口：
 
 ```cpp
 void Server::publish(
@@ -283,18 +283,19 @@ void Server::publish(
 - TCP Collector 发布时校验注册身份和消息中的 `device_id` 一致。
 - Monitor 关闭时，从它订阅的所有 device 集合中删除 fd。
 - TCP Collector 关闭时不删除 device 的 Monitor 订阅，因为该 device 以后可能重连或由 Modbus 数据源继续发布。
-- `publish()` 遍历订阅者前验证对应 Connection 仍然存在；发现陈旧 fd 时安全清理。
+- `publish()` 使用订阅集合副本遍历，并在发送前验证对应 Connection 仍存在、角色为 Monitor 且未进入关闭状态；常规订阅清理由 `onClose()` 完成。
 
-### 验收场景
+### 已验证场景
 
-- Collector 先注册、Monitor 后订阅。
-- Monitor 先订阅、Collector 后上线。
-- 一个 device 对多个 Monitor。
-- 一个 Monitor 订阅多个 device。
-- 重复订阅不产生重复转发。
-- Collector 断线重连后 fd 改变，原 Monitor 订阅仍然有效。
-- TCP Collector 使用错误 device ID 发布时被拒绝。
-- Monitor 断开后所有 device 订阅集合不残留其 fd。
+- [x] Collector 先注册、Monitor 后订阅。
+- [x] Monitor 先订阅、Collector 后上线。
+- [x] 一个 device 对多个 Monitor。
+- [x] 一个 Monitor 订阅多个 device。
+- [x] 重复订阅不产生重复转发。
+- [x] Collector 断线重连后 fd 改变，原 Monitor 订阅仍然有效。
+- [x] 重复 Collector 注册被拒绝。
+- [x] TCP Collector 使用错误 device ID 发布时被拒绝。
+- [x] Monitor 断开后所有 device 订阅集合不残留其 fd。
 
 ---
 
@@ -338,17 +339,17 @@ void Server::publish(
 
 以下项目全部勾选后再开始添加 Modbus：
 
-- [ ] Connection 回调期间对象生命周期安全。
-- [ ] 关闭请求幂等，不重复清理或重复关闭 fd。
-- [ ] ERR/HUP/RDHUP 和系统调用错误处理完成。
-- [ ] 活跃连接定时器能够持续重新调度。
-- [ ] 接收缓冲区容量与协议最大包定义一致。
-- [ ] `append()` 失败得到明确处理。
-- [ ] device_id 发布订阅和统一 `publish()` 接口完成。
-- [ ] 现有 1→1、1→N、N→N 小规模测试通过。
-- [ ] ASan/UBSan 关键场景通过。
-- [ ] `docs/ARCHITECTURE.md` 恢复并更新为当前事实来源。
-- [ ] `test/BENCHMARK.md` 只记录可复现且口径准确的结果。
+- [x] Connection 回调期间对象生命周期安全。
+- [x] 关闭请求幂等，不重复清理或重复关闭 fd。
+- [x] ERR/HUP/RDHUP 和系统调用错误处理完成。
+- [x] 活跃连接定时器能够持续重新调度。
+- [x] 接收缓冲区容量与协议最大包定义一致。
+- [x] `append()` 失败得到明确处理。
+- [x] device_id 发布订阅和统一 `publish()` 接口完成。
+- [x] 现有 1→1、1→N、N→N 小规模测试通过。
+- [x] ASan/UBSan 关键场景通过。
+- [x] `docs/ARCHITECTURE.md` 恢复并更新为当前事实来源。
+- [x] `test/BENCHMARK.md` 只记录可复现且口径准确的结果。
 - [ ] git diff 中没有 `.idea/`、`__pycache__/` 等无关生成文件。
 
 ## 十、Modbus 阶段的第一步（本计划完成后）

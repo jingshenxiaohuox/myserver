@@ -14,8 +14,8 @@ public:
     ~EventLoop();
 
     // ── epoll 封装 ──────────────────────────────────
-    void addFd(int fd, uint32_t events);
-    void modFd(int fd, uint32_t events);
+    bool addFd(int fd, uint32_t events);
+    bool modFd(int fd, uint32_t events);
     void delFd(int fd);
 
     // ── 事件分发表 ──────────────────────────────────

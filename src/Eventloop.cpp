@@ -1,31 +1,73 @@
 #include <EventLoop.h>
 #include <unistd.h>   // close
 #include <sys/epoll.h> // epoll_create1, epoll_ctl, epoll_wait
+#include <cerrno>
+#include <system_error>
+#include <cstring>
+#include <iostream>
+#include <string>
 
-EventLoop::EventLoop() {
-    epoll_fd_ = epoll_create1(0);
-}
+EventLoop::EventLoop()
+    : epoll_fd_(epoll_create1(EPOLL_CLOEXEC))
+    {
+    //防止epoll创建失败继续执行
+        if (epoll_fd_ == -1)
+        {
+            const int error = errno;
+            throw std::system_error(
+                error,
+                std::generic_category(),
+                "epoll_create1"
+            );
+        }
+    }
 
 EventLoop::~EventLoop() {
     close(epoll_fd_);
 }
 
-void EventLoop::addFd(int fd, uint32_t events) {
+bool EventLoop::addFd(int fd, uint32_t events) {
     struct epoll_event ev{};
     ev.events = events;
     ev.data.fd = fd;
-    epoll_ctl(epoll_fd_, EPOLL_CTL_ADD, fd, &ev);
+
+    if (epoll_ctl(epoll_fd_, EPOLL_CTL_ADD, fd, &ev) == -1)
+    {
+        const int error = errno;
+        std::cerr << "epoll_ctl(ADD) failed: fd=" << fd
+                << ", errno=" << error
+                << " (" << std::strerror(error) << ")\n";
+        return false;
+    }
+
+    return true;
 }
 
-void EventLoop::modFd(int fd, uint32_t events) {
+bool EventLoop::modFd(int fd, uint32_t events) {
     struct epoll_event ev{};
     ev.events = events;
     ev.data.fd = fd;
-    epoll_ctl(epoll_fd_, EPOLL_CTL_MOD, fd, &ev);
+
+    if (epoll_ctl(epoll_fd_, EPOLL_CTL_MOD, fd, &ev) == -1)
+    {
+        const int error = errno;
+        std::cerr << "epoll_ctl(MOD) failed: fd=" << fd
+                << ", errno=" << error
+                << " (" << std::strerror(error) << ")\n";
+        return false;
+    }
+
+    return true;
 }
 
 void EventLoop::delFd(int fd) {
-    epoll_ctl(epoll_fd_, EPOLL_CTL_DEL, fd, nullptr);
+    if (epoll_ctl(epoll_fd_, EPOLL_CTL_DEL, fd, nullptr) == -1)
+    {
+        const int error = errno;
+        std::cerr << "epoll_ctl(DEL) failed: fd=" << fd
+                << ", errno=" << error
+                << " (" << std::strerror(error) << ")\n";
+    }
 }
 
 void EventLoop::setHandler(int fd, std::function<void(uint32_t)> handler) {
@@ -48,7 +90,26 @@ void EventLoop::run() {
     while (true) {
         //epollwait进入一个for循环
         int ready_num = epoll_wait(epoll_fd_, events_, MAX_EVENTS, 5000);
+        if (ready_num == -1)
+        {
+            const int error = errno;
 
+            if (error == EINTR)
+            {
+                checkTimers();
+                continue;
+            }
+
+            const std::string context =
+                "epoll_wait: epoll_fd=" + std::to_string(epoll_fd_)
+                + ", errno=" + std::to_string(error);
+
+            throw std::system_error(
+                error,
+                std::generic_category(),
+                context
+            );
+        }
         
         //检查定时器(不管有没有事件都要检查)
         checkTimers();
@@ -57,7 +118,8 @@ void EventLoop::run() {
         for (int i = 0; i < ready_num; i++) {
             auto it = handlers_.find(events_[i].data.fd);
             if (it != handlers_.end()) {
-                it->second(events_[i].events);
+                auto handler = it->second;
+                handler(events_[i].events);
             }
             
         }

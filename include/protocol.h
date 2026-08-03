@@ -2,7 +2,7 @@
 #include <cstdint>
 
 static constexpr uint16_t MAGIC_NUMBER = 520;
-static constexpr uint32_t MAX_PAYLOAD_SIZE = 4 * 1024 * 1024; //4MB
+  static constexpr uint32_t MAX_PAYLOAD_SIZE = 256 * 1024; //256kb
 
 enum class MsgType : uint16_t {
     HeartBeat = 0x0001,

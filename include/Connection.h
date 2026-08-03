@@ -15,6 +15,9 @@ public:
     void handleRead();
     void handleWrite();
     void send(const char* data, size_t len);
+    void requestClose();
+    bool isClosing() const { return closing_;  }
+    void handleError();
 
     std::function<void(Connection*, const char*, size_t)> on_message_;
     std::function<void(Connection*)> on_close_;
@@ -28,5 +31,6 @@ public:
 private:
     RingBuffer recv_buffer_;
     RingBuffer send_buffer_;
+    bool closing_ = false;
     void updateEpollout();
 };

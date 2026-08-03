@@ -349,18 +349,43 @@ int main() {
 - [x] EventLoop.h / EventLoop.cpp
 - [x] main.cpp 瘦身
 
+### Modbus 准入收尾进度（更新至 2026-08-03）
+
+- [x] 任务 1：Connection 生命周期与事件安全。
+  - `connections_` 使用 `shared_ptr`，事件 handler 捕获 `weak_ptr` 并在本轮事件内保活。
+  - `requestClose()` 提供幂等关闭；`onClose()` 校验连接身份，转发时使用订阅列表快照。
+- [x] 任务 2：系统调用与 epoll 错误处理。
+  - `epoll_create1/epoll_ctl/epoll_wait` 已检查错误；`EINTR` 可重试，真实错误带操作名、fd、errno 和错误文本。
+  - 监听端使用 `SOCK_NONBLOCK | SOCK_CLOEXEC`，客户端使用 `accept4()` 原子设置相同标志。
+  - `recv/write` 区分 `EINTR`、`EAGAIN/EWOULDBLOCK` 与真实错误。
+  - 已处理 `EPOLLERR/EPOLLHUP/EPOLLRDHUP`，其中 `EPOLLERR` 通过 `SO_ERROR` 获取真实 socket 错误。
+- [x] 任务 3：心跳定时器重新调度。
+  - TimerEntry 到期时重新计算 `last_active_time_ + 30s`；连接尚未超时时按剩余时间重新入堆，否则发起幂等关闭。
+  - 双连接计时验证中，静默连接约 `t=30s` 关闭，`t=20s` 活动一次的连接约 `t=50s` 关闭。
+- [x] 任务 4：接收缓冲区与协议上限统一。
+  - `MAX_PAYLOAD_SIZE` 为允许取到的 256 KiB 上限；完整接收容量覆盖 Header、最大 Payload 和一次 64 KiB `recv()` 余量。
+  - `RingBuffer::append()` 失败时记录 fd、可读/可写字节和本次读取长度，随后立即发起幂等关闭。
+  - Python 客户端使用相同的 256 KiB 上限与 `length > MAX_PAYLOAD_SIZE` 非法判定。
+- [x] 任务 5：改为基于 `device_id` 的发布订阅。
+  - 正向索引为 `device_id → Monitor fd 集合`，反向索引为 `Monitor fd → device_id 集合`；Collector fd 仅用于在线状态和来源身份校验。
+  - TCP Collector、后续 Modbus 适配器和模拟数据源可复用统一 `publish(device_id, type, payload, payload_len)` 入口。
+  - Monitor 可预订阅离线设备，重复订阅自动去重；Collector 断线重连后保留订阅，重复设备上线和错误设备身份会被拒绝。
+
+任务 2 验证口径：Debug 与 ASan/UBSan 构建均通过；同机 loopback 下完成 1→1、1→2、2→2 小规模正确性回归，以及慢 Monitor、TCP RST、`EPOLLRDHUP` 半关闭场景。这里的瞬时速率不代表真实网络带宽或稳定吞吐。
+
+任务 4 验证口径：Debug 与 ASan/UBSan 构建均通过；同机 loopback 下覆盖 0 字节 Payload、64 KiB 帧、最大合法 Payload、超限 1 字节 Header、Header/Payload 半包、粘包和 RingBuffer 回绕。另以 `/tmp` 隔离的小容量测试构建强制触发 `append()` 失败，确认只关闭问题连接且网关继续服务。这些结果只表示本机正确性，不代表真实网络带宽或稳定吞吐。
+
+任务 5 验证口径：Debug 与 ASan/UBSan 构建均通过；同机 loopback 下完成 1→2 小规模回归，并覆盖离线预订阅、重复订阅去重、一个 Monitor 订阅多个 device、Collector 换 fd 重连、重复 Collector 拒绝、错误设备身份拒绝及 Monitor 断线后的 fd 复用隔离。这些结果只表示本机正确性，不代表真实网络带宽或稳定吞吐。
+
+当前 `include/utils.h` 中的 `setNonBlocking()` 已无运行时调用；监听和客户端 fd 均在创建时原子设置非阻塞。该遗留文件在最终文档与文件结构清理时处理。
+
 ## Phase 1 预规划（先做 Modbus TCP）
 
-已完成的基础重构：
+Modbus 准入结论：
 
-- [x] `main.cpp` 已拆分为 `Server` / `Connection` / `EventLoop`。
-- [x] `send_buffer` 为 4 MiB，`RingBuffer::append` 返回 `bool`，发送失败会经 `on_close_` 清理连接。
-
-进入 Phase 1 前仍需处理：
-
-1. 修正定时器刷新：当前不再在每次 `recv` 时重复入堆，但也没有重新安排下一次超时检查。
-2. 为注册/订阅增加成功与错误 ACK；压测客户端收到全部 ACK 后再开始计时。
-3. 补 Release 构建、CPU/RSS/延迟采样与结构化日志。
+- 生命周期、系统调用错误、定时器、协议边界和 `device_id` 发布订阅五项收尾任务均已完成并通过 Debug、ASan/UBSan 关键验证。
+- `test/BENCHMARK.md` 已审计：保留历史样本的测试提交、构建模式、机器、loopback 环境、负载、未采集项及适用边界，不将瞬时样本表述为真实网络带宽或稳定吞吐。
+- 注册/订阅 ACK、Release 构建、CPU/RSS/延迟采样和结构化日志继续作为非阻塞技术债务，不阻止最小 Modbus TCP 闭环启动。
 
 Phase 1 最小闭环：
 
@@ -379,7 +404,7 @@ Modbus TCP ADU 解析 → 统一内部消息 → 复用现有发布订阅分发
 - 1→N：本次成功完成到 62 个 Monitor；64 个 Monitor 连续两次触发高水位线保护并未收齐。
 - N 对 N 配对：本次成功完成到 15 对；16 对触发慢客户端保护。
 - N×N 全矩阵：2×2 完成；3×3 在 100 帧突发下重复性不足，说明单线程输出排空与 1 MiB 高水位线已成为边界。
-- Phase 0 后续：修正心跳定时器刷新、补 Release 构建和 CPU/RSS/延迟采样，并区分突发背压边界与限速后的可持续吞吐。
+- Phase 0 后续：心跳定时器刷新已修正；仍需补 Release 构建和 CPU/RSS/延迟采样，并区分突发背压边界与限速后的可持续吞吐。
 - 路线决策：Phase 1 先实现最小 Modbus TCP 闭环（解析设备数据 → 统一内部消息 → 现有订阅分发）；Phase 2 的多 Reactor/线程池由真实协议负载与持续压测数据驱动。
 
 ---

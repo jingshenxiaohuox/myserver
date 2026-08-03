@@ -8,7 +8,7 @@ HEADER_FORMAT = '!HBHIHH'
 HEADER_SIZE = struct.calcsize(HEADER_FORMAT)
 MAGIC = 520
 VIDEO_FRAME = 2
-MAX_PAYLOAD = 4 * 1024 * 1024
+MAX_PAYLOAD = 256 * 1024
 
 
 def packet(kind, device_id, body=b''):
