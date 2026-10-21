@@ -19,7 +19,7 @@
 #include <vector>
 
 namespace {
-    constexpr int kConnectionTimeoutSeconds = 30;
+    constexpr int kConnectionTimeoutSeconds = 4 * 60 * 60;
 }
 
 
